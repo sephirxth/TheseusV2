@@ -1,0 +1,17 @@
+{
+  "name": "theseus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "theseus": "./src/cli.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-concurrency=1 test/*.test.ts test/acceptance/*.test.ts",
+    "test:acceptance": "node --test test/acceptance/*.test.ts",
+    "mutate": "node test/mutation-lock.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
