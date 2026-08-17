@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TheseusV2 完整用户用例 · U1–U24</title>
+<style>
+  :root{ --ink:#1a1a1a; --ink2:#3a3a3a; --ink3:#6f6f6f; --line:#c4bfb2; --line2:#e6e1d6;
+         --desk:#e8e5dd; --paper:#faf8f2; --bg:var(--desk); --card:#fff; --tipbg:#fffdf8;
+         --dg-struct:var(--ink); --dg-key:var(--ink); --paper2:#f2eedf; }
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.9 "Source Han Serif SC","Noto Serif CJK SC","Songti SC",STSong,Georgia,"Times New Roman",serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:840px;margin:40px auto;background:var(--paper);
+    border:1px solid var(--line2);border-radius:3px;padding:56px 48px 84px;
+    box-shadow:0 1px 2px rgba(0,0,0,.05), 0 16px 44px rgba(70,58,32,.13)}
+  h1,h2,h3,h4,.sub,.boxfig,table{font-family:"Source Han Sans SC","Noto Sans CJK SC","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif}
+  h1{font-size:23px;font-weight:700;line-height:1.5;margin:0 0 6px}
+  h2{font-size:18px;font-weight:680;margin:44px 0 4px;padding-bottom:7px;border-bottom:2px solid var(--ink)}
+  h3{font-size:16px;font-weight:680;margin:30px 0 2px}
+  h4{font-size:14.5px;font-weight:680;margin:22px 0 2px;color:var(--ink2)}
+  p{margin:14px 0;text-align:justify}
+  b,strong{font-weight:680}
+  code,.mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.84em;color:var(--ink2)}
+  a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+  .sub{font-size:13px;color:var(--ink3);margin:0 0 30px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+  .lede{font-size:17px;line-height:1.85;border-left:3px solid var(--ink);padding:2px 0 2px 18px;margin:26px 0}
+  .gloss{position:relative;border-bottom:1px dotted var(--ink3);cursor:help}
+  .gloss .tip{visibility:hidden;opacity:0;transition:opacity .12s;
+    position:absolute;left:0;bottom:150%;z-index:60;
+    width:max-content;max-width:min(360px,84vw);white-space:normal;text-align:left;
+    background:var(--tipbg);color:var(--ink);border:1px solid var(--ink);
+    padding:9px 12px;border-radius:3px;box-shadow:0 5px 18px rgba(0,0,0,.16);
+    font-family:"Source Han Sans SC","PingFang SC","Microsoft YaHei",sans-serif;font-size:12.7px;line-height:1.65;font-weight:400}
+  .gloss.open .tip{visibility:visible;opacity:1}
+  @media (hover:hover) and (pointer:fine){ .gloss:hover .tip{visibility:visible;opacity:1} }
+  .tip .src{display:block;margin-top:5px;color:var(--ink3);font-size:11.5px}
+  pre{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.65;
+    background:var(--paper2);border:1px solid var(--line);border-radius:4px;padding:12px 14px;overflow-x:auto;margin:16px 0}
+  .boxfig{margin:20px 0;border:1px solid var(--line);border-radius:4px;padding:16px 18px;background:var(--card)}
+  .boxfig .cap{font-size:12.5px;color:var(--ink3);margin-bottom:10px}
+  .boxfig .cols{display:flex;gap:0}
+  .boxfig .col{flex:1;border:1px solid var(--ink);padding:10px 13px;font-size:13px}
+  .boxfig .col+.col{border-left:none}
+  .boxfig .col.dash{border-style:dashed}
+  .boxfig .lab{font-weight:680;display:block;margin-bottom:3px}
+  .dgm{margin:22px 0;border:1px solid var(--line);border-radius:4px;background:var(--card);padding:18px 18px 12px}
+  .dgm .cap{font-size:12.5px;color:var(--ink3);margin-top:11px;
+    font-family:"Source Han Sans SC","PingFang SC","Microsoft YaHei",sans-serif}
+  .dgm .cap-top{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.13em;
+    color:var(--dg-key);margin-bottom:14px}
+  .dgm .legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:13px;border-top:1px dashed var(--line);padding-top:11px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--ink3)}
+  .dgm .legend .it{display:inline-flex;align-items:center;gap:6px}
+  .dgm .legend .sw{width:11px;height:11px;border-radius:2px;flex:none;display:inline-block}
+  .dnode{background:var(--card);border:1.5px solid var(--ink);border-radius:5px;padding:11px 14px;text-align:center}
+  .dnode .t{font-weight:680;font-size:13.5px;line-height:1.35}
+  .dnode .s{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:var(--ink3);margin-top:3px}
+  .dnode.key{border-width:2px}
+  .dflow{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+  .dgroup{border:1.3px dashed var(--line);border-radius:8px;background:var(--paper2);
+    padding:22px 12px 12px;position:relative;display:flex;flex-direction:column;gap:9px}
+  .dgroup>.glab{position:absolute;top:-9px;left:11px;background:var(--card);padding:0 7px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:10px;color:var(--ink3)}
+  .dconn{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:var(--ink3);
+    display:flex;flex-direction:column;align-items:center;gap:3px;min-width:54px}
+  .dconn .g{font-size:15px;letter-spacing:-1px}
+  .dconn .lbl{font-size:9.5px;text-align:center;line-height:1.3}
+  .dlayers{display:flex;flex-direction:column;gap:7px}
+  .dlayer{display:grid;grid-template-columns:112px 1fr;gap:12px;align-items:center;
+    border:1.3px solid var(--line);border-radius:4px;padding:9px 11px;background:var(--paper2)}
+  .dlayer .ln{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;font-weight:700;
+    text-align:center;border-radius:3px;padding:5px 3px;border:1.3px solid var(--ink)}
+  .dlayer.main .ln{background:var(--dg-struct);color:#fff}
+  .dlayer.dim .ln{border-style:dashed;color:var(--ink3);border-color:var(--ink3)}
+  .dlayer .ld{font-size:12.5px;color:var(--ink2);line-height:1.55}
+  @media (max-width:640px){ .dflow{flex-direction:column} .dconn{flex-direction:row;min-width:0} .dlayer{grid-template-columns:78px 1fr} }
+  .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{text-align:left;padding:8px 11px;border:1px solid var(--line);vertical-align:top}
+  th{background:#efeadd;font-weight:680}
+  ol{padding-left:24px} ol li{margin:6px 0}
+  ul{padding-left:22px} ul li{margin:6px 0}
+  blockquote{margin:16px 0;padding:2px 0 2px 16px;border-left:2px solid var(--line);color:var(--ink2);font-size:14.5px}
+  footer{margin-top:50px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--ink3);
+    font-family:"Source Han Sans SC","PingFang SC",sans-serif}
+  #backjump{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:300;
+    font-family:"Source Han Sans SC","PingFang SC",sans-serif;font-size:13px;line-height:1;
+    background:var(--ink);color:#fff;border:1px solid var(--ink);
+    padding:11px 16px;border-radius:20px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+  #backjump[hidden]{display:none}
+  .tip-open #backjump{display:none}
+  @media print{ body{background:#fff} .wrap{margin:0;max-width:none;border:none;box-shadow:none;padding:0} #backjump{display:none} }
+  @media (max-width:640px){
+    body{font-size:16.5px;line-height:1.85}
+    .wrap{margin:12px 8px;padding:30px 18px 72px}
+    p{text-align:left}
+    h2{margin-top:34px}
+    .boxfig .cols{flex-direction:column}
+    .boxfig .col{border:1px solid var(--ink)}
+    .boxfig .col+.col{border-top:none}
+    .gloss .tip{position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));
+      top:auto;width:auto;max-width:none;font-size:14px;line-height:1.7;padding:13px 15px}
+  }
+
+  /* ── 用例三段的分节标记（本文新增，其余全部沿用调研件模板）────────── */
+  .uc{margin:34px 0 0;padding-top:4px}
+  .seg{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;letter-spacing:.16em;
+    color:var(--ink3);margin:20px 0 -4px;display:block}
+  .seg::before{content:"── "}
+  blockquote.neg{margin:12px 0 0;padding:13px 16px;border-left:3px solid var(--ink);
+    background:var(--paper2);border-radius:0 4px 4px 0;color:var(--ink2)}
+  blockquote.neg p:first-child{margin-top:0} blockquote.neg p:last-child{margin-bottom:0}
+  .why{margin:18px 0 0;padding-top:11px;border-top:1px dashed var(--line2);
+    font-size:13px;line-height:1.78;color:var(--ink3)}
+  .why p{margin:8px 0;font-size:13px}
+  .why b,.why strong{color:var(--ink2);font-weight:680}
+  .why table{font-size:12.5px}
+  .why blockquote{font-size:12.5px;margin:10px 0}
+  .why .lab{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;letter-spacing:.16em;
+    display:block;margin-bottom:4px}
+  .note{border:1px dashed var(--line);border-radius:4px;background:var(--card);
+    padding:11px 14px;margin:16px 0;font-size:13.5px;line-height:1.75;color:var(--ink2)}
+  .note .nl{display:block;font-weight:680;font-size:12.5px;color:var(--ink);margin-bottom:4px;
+    font-family:"Source Han Sans SC","PingFang SC",sans-serif}
+  .note p{margin:8px 0;font-size:13.5px} .note p:first-of-type{margin-top:0} .note p:last-child{margin-bottom:0}
+  /* 现状标注：形状 + 文字双重编码，不靠颜色单独承担含义 */
+  .status{list-style:none;padding:0 0 0 14px;margin:14px 0;border-left:3px solid var(--line)}
+  .status li{margin:11px 0;font-size:14px;line-height:1.8}
+  .st{display:inline-block;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:11px;letter-spacing:.05em;padding:2px 9px;border-radius:3px;
+    border:1.5px solid var(--ink);margin-right:8px;white-space:nowrap;font-weight:700}
+  .st.done{background:var(--ink);color:#fff}
+  .st.half{background:repeating-linear-gradient(45deg,var(--line2) 0 3px,transparent 3px 7px);color:var(--ink)}
+  .st.none{border-style:dotted;border-color:var(--ink3);color:var(--ink3);background:var(--card)}
+  .stkey{display:flex;flex-wrap:wrap;gap:8px 18px;margin:14px 0 0;font-size:12.5px;color:var(--ink3)}
+  .toc{margin:18px 0;font-size:14px}
+  .toc ol{padding-left:22px} .toc li{margin:4px 0}
+  /* 窄屏保险：长路径/编号这类不含空格的串允许断行，别把正文推出屏幕 */
+  code{overflow-wrap:anywhere;word-break:break-word}
+  /* 总览表：五列，窄屏下尽量少让读者横滑 */
+  table.sum{font-size:12.5px}
+  table.sum th,table.sum td{padding:6px 7px}
+  table.sum td:nth-child(1),table.sum td:nth-child(3),
+  table.sum td:nth-child(4),table.sum td:nth-child(5){white-space:nowrap}
+  @media (max-width:640px){
+    table.sum{font-size:11.5px}
+    table.sum th,table.sum td{padding:5px 5px}
+  }
+</style>
+</head>
+<body>
+<button id="backjump" type="button" hidden>↩ 返回上一处</button>
+<div class="wrap">
+
+<h1>TheseusV2 完整用户用例 · U1–U24</h1>
+<p class="sub">需求 · 2026-08-17 · 四组合一：启停 U1–U6 · 痕迹 U7–U14 · 意图树 U15–U19 · 环 U20–U24 · 面向初次接触这个项目的读者</p>
+
+<div class="lede">
+这 24 条只写<b>一个人要干什么、他应该体验到什么</b>，不写用什么手段做到。<br>
+每条都有三段：<b>我应该体验到</b>（正面）· <b>不这么做会怎样</b>（反面）· <b>为什么这条重要</b>（真发生过的事）。<br>
+一条贯穿的规矩：<b>说不出「它在这个项目里真出过什么事」的用例，是想象出来的需求，删掉。</b>
+</div>
+
+<div class="toc">
+<ol>
+<li><a href="#why-neg">为什么每条都要写反面</a></li>
+<li><a href="#map">四组各管什么</a></li>
+<li><a href="#g1">启停 · U1–U6</a>——东西在不在</li>
+<li><a href="#g2">痕迹 · U7–U14</a>——发生了什么、为什么</li>
+<li><a href="#g3">意图树 · U15–U19</a>——我在追什么</li>
+<li><a href="#g4">环 · U20–U24</a>——它自己动起来</li>
+<li><a href="#table">24 条总览与验收现状</a></li>
+</ol>
+</div>
+
+<h2 id="why-neg">一、为什么每条都要写反面</h2>
+
+<p>这套用例原本只写正面——"我应该体验到什么"。2026-08-17 定下一条新约定：<b>每条再加一段"不这么做会怎样"，同样具体，同样是从人的角度写的一个场景。</b></p>
+
+<div class="lede">
+<b>正面只能验"它做对了"，验不出"它做错的时候会怎样"；而这套系统里最贵的失败是"坏了还长得像好的"，那类失败正面用例一条都抓不住。</b>
+</div>
+
+<p>"坏了还长得像好的"是什么样子：一份编出来的完成记录、一条永远说"是"的关卡、一段和"还在想"分不清的沉默。它们的共同点是——<b>出问题的那一刻，屏幕上什么异常都没有。</b></p>
+
+<div class="boxfig">
+  <div class="cap">图 1　同一条用例，正面和反面各验的是什么</div>
+  <div class="cols">
+    <div class="col"><span class="lab">正面 · 我应该体验到</span>验"它做对了"。<br><b>只有这一半的规格，是一份永远会绿的规格</b>——因为它从不描述失败长什么样。</div>
+    <div class="col dash"><span class="lab">反面 · 不这么做会怎样</span>验"它做错的时候被挡住了"。<br>写的是<b>一个具体的人在具体一天遇到的具体处境</b>，不是抽象的风险清单。</div>
+  </div>
+</div>
+
+<p>由此推出验收的做法：<b>两边都要进验收——一条<span class="gloss">断言<span class="tip">一句可以被机器判真假的话，比如"做完这个动作的那一瞬间去数进程，必须是 0 个"。验收文档由一条条断言组成；测试是断言的代码实现。<span class="src">本项目 docs/acceptance/ 的组织方式</span></span></span>验正面成立，一条断言验反面被挡住。</b></p>
+
+<p>反面场景也不是编的。它们来自 2026-08-17 那次对照调研——把 Hermes 的看板（一套已经跑了 582 个提交的 AI 协作调度）拆开看，<b>它每一道防线都对着一种真实发生过的翻车</b>。这四份用例里的反面，是照着别人翻过的车写的。</p>
+
+<h3>启停那一组多一样东西：现状标注</h3>
+
+<p>四组里<b>只有启停是代码和验收都齐的</b>。所以 U1–U6 每条反面场景后面多一句现状，三选一：</p>
+
+<div class="stkey">
+  <span><span class="st done">✓ 已被挡住</span>写清是哪条断言挡的</span>
+  <span><span class="st half">◐ 挡了一半</span>写清另一半是什么</span>
+  <span><span class="st none">○ 还没挡</span>那就是一个真缺口</span>
+</div>
+
+<p style="margin-top:16px"><b>最后那一类才是这次的产出。已被挡住的那些只是记录在案，不算成绩。</b></p>
+
+<div class="note">
+<span class="nl">一条贯穿四份的规矩：用例里不写命令</span>
+<p>命令行是<b>一种</b>实现——人可能在终端敲、可能在面板上点，<b>也可能就是跟 agent 说一句话</b>；最后这条对 Theseus 尤其真，而写死命令等于把它挡在门外。用例只写"我要做的事"，怎么做归设计文档。</p>
+<p>这条是事后补的，而且有代价证据：<b>为了一个命令名来回三轮，那场争论本身就是症状，它根本不该发生在需求文档里。</b></p>
+</div>
+
+<h2 id="map">二、四组各管什么</h2>
+
+<p>24 条分四组。它们不是四个功能模块并排，而是<b>三块静的加一块让它们动起来的</b>。</p>
+
+<div class="dgm">
+  <div class="cap-top">四组用例 · 各管一个不同的问题</div>
+  <div class="dlayers">
+    <div class="dlayer main">
+      <div class="ln">启停<br>U1–U6</div>
+      <div class="ld"><b>东西在不在。</b>把系统跑起来、停干净、知道现在什么在跑、加一个新<span class="gloss">部件<span class="tip">系统里一个能单独起停的东西——一个服务、一个后台进程。这份文档里说"部件"，不说"服务"或"进程"，因为它可能是任何一种。<span class="src">本项目 requirements/lifecycle.md 的用语</span></span></span>、搬到另一台机器、出问题时能查</div>
+    </div>
+    <div class="dlayer main">
+      <div class="ln">痕迹<br>U7–U14</div>
+      <div class="ld"><b>发生了什么、为什么。</b><span class="gloss">痕迹<span class="tip">系统里每件事发生时留下的那条记录。这个词来自项目的 VISION——"必须要以某种可被语言和视觉观测的形式留下痕迹"。不叫账本、不叫事件表、不叫日志。<span class="src">本项目 VISION 原文</span></span></span>是一份东西，上面有两个动作：<b>留痕</b>是写它（只有 U12），<b>回忆</b>是读它（其余七条）</div>
+    </div>
+    <div class="dlayer main">
+      <div class="ln">意图树<br>U15–U19</div>
+      <div class="ld"><b>我在追什么。</b><span class="gloss">意图树<span class="tip">把"我现在在追什么、它是从哪个更大的念头分出来的"排成一棵树。关键是它<b>不另存一份</b>——意图是因，发生的事是果，因果本来就在痕迹里，这棵树只是把"因"那一侧显出来。<span class="src">本项目 requirements/intent.md</span></span></span><b>不是另存一份东西，是从痕迹里看出来的</b>——所以不会出现"树上写的"和"实际发生的"是两回事</div>
+    </div>
+    <div class="dlayer dim">
+      <div class="ln">环<br>U20–U24</div>
+      <div class="ld"><b>它自己动起来。</b>前三样之间<b>没有任何东西在动</b>，每一步都得人推。<span class="gloss">环<span class="tip">把"事情发生 → 留痕 → 有东西看见了 → 动手 → 又留痕"接成一个闭合的循环，让系统不必每一步都等人推。<span class="src">本项目 requirements/loop.md</span></span></span>这一组把它接上——<b>不是配合得不好，是结构上缺一块</b></div>
+    </div>
+  </div>
+  <div class="legend">
+    <span class="it"><span class="sw" style="background:var(--dg-struct)"></span>已有需求、设计、验收（程度不一）</span>
+    <span class="it"><span class="sw" style="border:1.3px dashed var(--ink3);background:var(--card)"></span>只有需求</span>
+  </div>
+  <div class="cap">图 2　四组各回答一个不同的问题。<b>前三组是名词（东西、记录、树），第四组是动词</b>——它把前三组接成一个能自己转的东西。</div>
+</div>
+
+<h2 id="g1">三、启停 · U1–U6 —— 东西在不在</h2>
+
+<div class="lede">
+这一组管的是<b>东西在不在</b>：让它跑起来、让它停干净、知道现在什么在跑、往里加新的、整套搬走、出事时能查。<br>
+<b>四组里只有这一组代码和验收都齐了</b>，所以每条反面后面带一句现状。
+</div>
+
+<div class="uc" id="u1">
+<h3>U1 · 我要把系统跑起来</h3>
+
+<span class="seg">我要做的</span>
+<p>让系统整个跑起来。或者只让某一个部件跑起来，它依赖的东西跟着一起来。</p>
+
+<span class="seg">我应该体验到</span>
+<p>一个动作，该跑的都跑起来了，顺序对。<b>手滑连敲三次，还是那些进程，不会起出重复的。</b> 我不需要知道谁依赖谁。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头 · 起少了，可它说全好了</b>：我做那一个动作，它回答好了。三个部件都在名单上，都写着在跑。</p>
+<p>其中一个其实干不了活——它那条命令本身是错的，指向一个根本不存在的程序。<b>但把它拉起来的那层壳一秒就活了，所以那一刻它和好的长得一模一样。</b> 我要到下一次去问"现在什么在跑"，才看见它是坏的。这中间我已经照着那份名单派活了。</p>
+<p><b>更难看的是我为什么一直没发现</b>：因为"跑起来"这个动作不保证结果，我配了个定时器，每两分钟替我再跑一遍碰运气。<b>于是每次都有东西在背后替它补上</b>，启动本身不可靠这件事就永远浮不出来——直到我要停的时候，那个定时器把整套东西又拉了回来。</p>
+<p><b>另一头 · 起多了</b>：我手滑连做三次。三份同样的东西同时跑着，同一件活三个进程在做，各写各的，<b>我最后拿到什么取决于谁写得最慢</b>。而这三次它都回答"好了"。</p>
+</blockquote>
+
+<span class="seg">现状</span>
+<ul class="status">
+<li><span class="st half">◐ 挡了一半</span><b>一头。</b>验收 U1-1 数的是"进程在不在"——那个坏部件的进程确实在，所以这条断言拦不住它，设计里也把这个限制诚实写着。<b>另一半靠我在声明里说清"什么算它起来了"</b>：说了的部件，启动动作会一直等到它真能干活。这句话是选配的，不说就没有。</li>
+<li><span class="st done">✓ 已被挡住</span><b>另一头。</b>验收 U1-3：连做三次，去数进程，不看它的回答。定时器那条路整个消失了——现在"跑起来"是一个状态，不是一个动作，重复做不会多出东西。</li>
+</ul>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>旧系统的"启动"是个动作，跑完不保证结果，只好配个定时器每两分钟再跑一遍碰运气。<b>一句不保证结果的命令，逼出了一个定时器。</b></p>
+</div>
+</div>
+
+<div class="uc" id="u2">
+<h3>U2 · 我要把系统停干净</h3>
+
+<span class="seg">我要做的</span>
+<p>让系统整个停下来。</p>
+
+<span class="seg">我应该体验到</span>
+<p>一个动作，<b>真停了</b>——不是"它说它停了"，是它留下的痕迹不再增长了。</p>
+<p><b>我不需要记住任何顺序。</b> 不需要"先关那个定时器再停服务"，不需要"停完等一会儿再确认"。<b>它说完成的那一刻就是真停了</b>，也不会留下什么在后台偷偷跑。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头 · 它说停了，两分钟后它自己回来</b>：我做那个停的动作，它回答停了，也确实安静下来了。<b>两分钟后那些进程又出现了</b>——有个定时器一直在把系统往回拉，而"那个定时器要在停服务之前关掉"这条，只存在于我脑子里。我第二天早上才发现它整夜都在跑。</p>
+<p><b>另一头 · 我只想停一个，结果停了三个</b>：我去停底下那一个部件。它停了，<b>靠它活的另外两个也一起没了</b>。这也许是对的——那两个本来就离不开它——但<b>做这个动作的那一刻，没有任何人告诉我这件事</b>，我以为我只动了一个。等我发现，那两个已经断了一段时间。</p>
+</blockquote>
+
+<span class="seg">现状</span>
+<ul class="status">
+<li><span class="st done">✓ 已被挡住</span><b>一头。</b>验收 U2-1 在停的动作返回那一瞬间就去数进程，不许等一会儿再数；U2-3 记下返回那一刻痕迹的大小，隔一段真实时间回来看必须一模一样；U2-4 扫全部文档，没有一句"要按什么次序做事"是写给我的。那个定时器不存在了。</li>
+<li><span class="st half">◐ 挡了一半</span><b>另一头。</b>连带停掉这件事本身是定死的，也有一条测试盯着它（靠它活的那个不许活下来）。<b>没挡住的是我不知道</b>：验收里每一次"只停一个"，停的都是没人靠着的部件，所以"我停了一个、结果停了三个"这个处境，一条断言都没有描述过。<b>这一条不在设计的 ★ 缺口表里。</b></li>
+</ul>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>2026-08-05 停旧系统，必须先关掉那个定时器再停服务——<b>顺序错了，两分钟后系统自己回来。而这条顺序当时只存在于我脑子里，没写在任何地方。</b></p>
+</div>
+</div>
+
+<div class="uc" id="u3">
+<h3>U3 · 我要知道现在什么在跑</h3>
+
+<span class="seg">我要做的</span>
+<p>问一句「现在什么在跑」。</p>
+
+<span class="seg">我应该体验到</span>
+<p>一眼看清。而且<b>它说的话我敢信</b>——说在跑就是真在跑，说不知道就是真不知道。</p>
+<p>不会出现"它说停了、其实还在跑"，也不会出现"它说跑着、其实还在启动中"。</p>
+
+<div class="note">
+<span class="nl">一条诚实的条件（2026-08-09 补，起因是验收测试 U3-3 报红）</span>
+<p>后半句<b>只在我告诉过它"什么算这个部件起来了"的时候才成立</b>。</p>
+<p>我没说，它就只能看见"进程在跑"——<b>没有任何系统能猜出一个程序什么时候准备好了。</b></p>
+<p>我说了，它就必须尊重这句话：<b>在那句话被满足之前，答案不许是"在跑"。</b></p>
+</div>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头 · 我宣布它停了，而我的证据经不起推敲</b>：2026-08-05，我说旧系统已经停了。<b>我拿出的证据是：它留下的记录不再增长。</b></p>
+<p>那条观察在两种情况下长得完全一样——<b>一种是它真停了，另一种是我看的那段时间太短。</b> 当时是后者。那段时间过去以后，它又往里写了 269 条。</p>
+<p><b>这不是它骗了我，是我把"安静"当成了证据。</b> 安静永远同时符合两种解释：还在做、和已经不在了。</p>
+<p><b>另一头 · 它说在跑，而它已经好几个小时干不了活了</b>：进程确实在，问多少次都说在跑。它起来的时候是好的，中途坏掉了，<b>而"它能不能干活"这句检查只在它起来那一刻做过一次</b>。上一回这种事，是六小时五十五分钟以后才有人发现。</p>
+</blockquote>
+
+<span class="seg">现状</span>
+<ul class="status">
+<li><span class="st half">◐ 挡了一半</span><b>一头。</b><b>系统自己不再靠"安静"下结论了</b>：验收 U2-1 和 U3-2 都是直接去数进程，一瞬间断言，不从"安静了多久"往回推。<b>没挡住的是人</b>——08-05 那个结论是我下的，不是系统下的，而文档和验收里没有任何一条拦着下一个人再用一次"记录不再增长"当证据。</li>
+<li><span class="st none">○ 还没挡</span><b>另一头。</b>这正是设计里的 <b>★6</b>：那句"什么算它起来了"只在启动那一次跑，跑完不再跑。<b>一个起来以后又变得干不了活的部件，我们仍然会说它在跑。</b></li>
+</ul>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>旧系统把"问不出来"一律当成"已经结束"。于是一个还在干活的执行器被判了死，系统转头又派了一个——<b>同一件活，两个进程在做。</b> 一句猜出来的话，比不说话更贵。</p>
+</div>
+</div>
+
+<div class="uc" id="u4">
+<h3>U4 · 我要加一个新部件</h3>
+
+<span class="seg">我要做的</span>
+<p>把一个新部件加进来——说清它叫什么、依赖谁、怎么起，<b>以及什么算它起来了</b>。</p>
+
+<span class="seg">我应该体验到</span>
+<p><b>写一行声明，它就被纳管了。</b> 不用改启停的代码，不用手写什么配置文件，不用去某个安装脚本里补一行。</p>
+<p>写错了要当场告诉我——依赖绕了个圈、依赖的东西根本不存在，应该<b>在动手做任何事之前</b>就被拦下来。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头 · 我没说什么算它起来了，于是我自己替它填了个意思</b>：我在声明里加了一行，漏掉了这一句。它只能看见进程在——<b>它没撒谎，是我把"进程在"读成了"能干活了"</b>。我照着这句"在跑"把活派过去，活掉进一个还没准备好的部件里。</p>
+<p><b>另一头 · 我说了，可我写的那句话自己出了问题</b>：我写下了"什么算它起来了"。<b>它永远不成立</b>——或者更难看的一种：<b>那句检查自己吊住了，不说"还没好"，也不说"好了"，就那么不响。</b></p>
+<p>我做那个启动动作，屏幕上什么都没有。<b>我分不出是该多等一会儿，还是它已经吊死在那儿了。</b></p>
+</blockquote>
+
+<span class="seg">现状</span>
+<ul class="status">
+<li><span class="st half">◐ 挡了一半</span><b>一头。</b>诚实那一半有断言：验收 U3-3 要求，我说了什么算起来了，在那句话被满足之前不许说"在跑"；我什么都没说，它报"进程在跑"是诚实的，不是撒谎。<b>没挡住的是我会读错</b>——除了这份文档里那段话，我加部件的时候没有任何东西提醒我"不说这一句，就等于没有这个保证"。</li>
+<li><span class="st half">◐ 挡了一半</span><b>另一头，而缺的正好是两处 ★。</b>"一直说还没好"那种有断言，到点会被判成失败，不会无限等下去；<b>"自己吊住、什么都不说"那种没被测过（★8）</b>；<b>"等多久算到点"这个行为本身也没被真正护住（★7）</b>——把那行限制拿掉，底下那套系统默认的兜底会顶上，测试照样绿，<b>被保护的是那行字，不是那个行为</b>。</li>
+</ul>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>旧系统里加东西有两条不同的路，两条路互相不知道对方存在。结果就是停机命令报告"全都没在运行"，而另一条路上确实有东西在跑。</p>
+</div>
+</div>
+
+<div class="uc" id="u5">
+<h3>U5 · 我要把 Theseus 搬到另一台机器</h3>
+
+<span class="seg">我要做的</span>
+<p>在一台新机器上，把 Theseus 装起来。</p>
+
+<span class="seg">我应该体验到</span>
+<p><b>拷仓库，跑一条命令，就好了。</b></p>
+<p>不会出现"忘了还有个东西装在系统里"。也不需要记得跑某个单独的安装脚本——<b>因为根本没有单独的安装步骤。</b></p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头 · 装完那一屏是真的，第二天早上是空的</b>：我把仓库拷到新机器，跑那一个动作，全起来了。我关掉远程连接去睡觉。<b>第二天早上，什么都没在跑。</b> 不是崩了，也不是装漏了——是我一登出，它们就跟着一起走了。而昨晚那一屏"全都在跑"确实是真的。</p>
+<p><b>另一头 · 为了验证搬家，我差点把邻居铲平</b>：要确认"全部恢复"，我得把这台机器上属于它的东西清干净。<b>我写下的是"把名字以它开头的全删光"。</b> 那台机器上还住着上一代系统，名字开头一模一样，而它们什么也没做错。<b>这条命令我真的写下来过。</b></p>
+</blockquote>
+
+<span class="seg">现状</span>
+<ul class="status">
+<li><span class="st none">○ 还没挡</span><b>一头。</b>整个仓库里没有任何东西管"我登出以后它还在不在"：我搜过一遍，提到这件事的只有三处，三处讲的都是另一码事（问不到底层系统的时候不许撒谎）。也没有任何一条断言碰过这个处境。<b>这一条不在设计的 ★ 缺口表里。</b></li>
+<li><span class="st half">◐ 挡了一半</span><b>另一头。</b>验收 U5-1 自己是干净的：它按名字一个一个删，还带一道闸门，名字不属于测试范围的直接拒绝。<b>没挡住的是下一次</b>——仓库里没有任何东西阻止下一个人（或者下一个 agent）再写一次"名字开头一样就一起删"。而按名字开头判断归属，正是当初差点出事的那个做法。</li>
+</ul>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>这是 VISION 里"自包含"那条规矩的真正目的。东西一旦散在系统各处，搬家就会漏，而漏掉的那部分往往等到出事才被发现。</p>
+</div>
+</div>
+
+<div class="uc" id="u6">
+<h3>U6 · 出问题时我要能查</h3>
+
+<span class="seg">我要做的</span>
+<p>出问题的时候查它。<b>而且不该只能用 Theseus 自己的工具</b>——底下那套系统本来就带着查看和跟日志的手段，那些也得能用得上。</p>
+
+<span class="seg">我应该体验到</span>
+<p><b>有唯一一个地方回答"现在应该有什么在跑"，而且它不会跟现实脱节。</b></p>
+<p>不存在"还有个东西在跑，但不在清单上"；也不存在"清单上有，实际没装"。两个方向对不上，都应该被主动报出来，而不是等我某天偶然撞见。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头 · 多出来的那个，谁也不删</b>：它被报出来了。第二天还在报，下个月还在报。<b>没有人删它，因为没有任何东西负责删。</b> 清单上天天挂着那一行脏的，挂到我不再看这份清单——<b>一份没人看的清单等于不存在</b>，而它还在每天尽职地报告。</p>
+<p><b>另一头 · 终于有东西负责删了，它删错了</b>：它判断"这是不是我造的"，用的是名字开头。上一代系统留下的东西名字开头一样，<b>它们什么也没做错，就那么没了</b>。</p>
+<p><b>还有一种，正好卡在"能查"这件事上</b>：真出事那天我去翻某个部件留下的记录，<b>那个文件从来没人管过它能长到多大</b>，已经涨到打不开了。平时不出事的时候，一个只涨不减的文件和一个正常文件长得一模一样。</p>
+</blockquote>
+
+<span class="seg">现状</span>
+<ul class="status">
+<li><span class="st half">◐ 挡了一半</span><b>一头。</b>报出来这一半有断言，而且是在我正常那一问里就报（验收 U6-1、U6-5）。<b>删这一半今天不存在</b>：设计里 <b>★2</b> 已经把规矩定死了（只删自己造的，靠记号，不靠猜），生成出来的每样东西上也确实盖了那个记号，<b>但今天没有任何东西拿这个记号去判断归属，也没有任何东西执行删除</b>。"多出来的东西谁删"今天的答案是：没人。<b>这一条不在 ★ 表里，因为 ★2 已经被划掉了。</b></li>
+<li><span class="st none">○ 还没挡</span><b>另一头。</b>删除这个动作还不存在，所以"按记号不按名字"这条规矩今天没有任何东西在执行它。将来谁去实现它，漏了这条规矩，仓库里也没有一条断言会因此报红。</li>
+<li><span class="st none">○ 还没挡</span><b>第三种。</b>这是设计里的 <b>★3</b>：记录只追加，不轮转，<b>仓库里没有任何一条断言看过它能长到多大</b>。</li>
+</ul>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>旧系统里有个服务是被临时手段凭空造出来的，磁盘上根本没有它的文件——<b>停掉之后，它从列表里凭空消失了。</b> 一个查不到来历、也留不下痕迹的东西，出事时你无从查起。</p>
+</div>
+</div>
+
+<h2 id="g2">四、痕迹 · U7–U14 —— 发生了什么、为什么</h2>
+
+<div class="lede">
+这一组管的是<b>记录本身</b>：发生的事查得到、没发生的事也查得到、有意义的事不被例行公事淹掉、一年后还翻得动、不靠谁记得去记、旧的记忆整个接进来。<br>
+<b>八条里只有 U12 是"写"，其余七条全是"读"</b>——这个比例不是巧合：读的需求容易想到，写的需求要等它漏了才被发现。
+</div>
+
+<div class="uc" id="u7">
+<h3>U7 · 我要能查"刚才那件事<u>为什么</u>发生"</h3>
+
+<span class="seg">我要做的</span>
+<p>问「这件事为什么会发生」。</p>
+
+<span class="seg">我应该体验到</span>
+<p>顺着往回一路查，<b>每一步都指得出它的上一步</b>，一直查到一个我认得的起点——我说的一句话、一个到点的时刻、一条从外面进来的消息。<b>中途不许断。</b></p>
+<p>也不需要我猜。不会出现"这儿应该是那个东西触发的吧"这种句子。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p>我问「昨天半夜那份东西是怎么发出去的」。它给我一条链子，<b>一步不缺</b>，我一路跟到底。</p>
+<p>最后一步写着：<b>因为两分钟到了。</b></p>
+<p>我再往上问一句，它说没有上一步了，这就是起点。<b>它没答错，它答完了。</b> 屏幕上摆着一次干干净净的追查，看起来和一次成功的追查一模一样——<b>只有我知道我什么也没问出来。</b></p>
+<p><b>另一头是"修过头"</b>：要是我嫌这种答案没用，改成"每条链子都必须查到一句人说的话"，那些本来就该由时钟起头的事会被一律判成断掉。<b>这个错真犯过</b>——这条用例最早写的理由是"一半是断头路"，就是这么算出来的，后来发现根本不成立。<b>一个把好的判成坏的检验，会让我从此不信这个检验。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+
+<div class="note">
+<span class="nl">⚠ 这条的理由一开始写错了</span>
+<p>原来写的是"只有 46.6% 说得出因为什么，剩下一半是断头路"。2026-08-09 用真实账本重算，那个说法不成立——<b>它把"本来就该没有上一步的起点"当成了"断掉的链子"。</b></p>
+</div>
+
+<p>真实情况是<b>链子基本是连的</b>：排掉心跳和定期扫描后剩 26741 条真事件，<b>97% 以上都能一路查到一个合法的起点</b>，真正指向"一条不存在的事件"的只有 <b>0.2%</b>。</p>
+
+<p><b>问题不在断，在于查到底之后落在哪儿。</b></p>
+
+<div class="scroll-x">
+<table>
+<tr><th>查到底落在</th><th>占比</th></tr>
+<tr><td><b>时钟到点</b></td><td><b>78.8%</b></td></tr>
+<tr><td><b>你说的一句话</b></td><td><b>17.4%</b></td></tr>
+</table>
+</div>
+
+<p>你问"这事为什么发生"，答案是"因为两分钟到了"——<b>技术上没断，实际上等于没答。</b></p>
+
+<p><b>一条完整但无意义的链子，和一条断了的链子，用起来是一样的。</b></p>
+
+<p>另有 <b>0.9%</b> 是真断的，而且<b>断的位置特别扎眼</b>——几乎全集中在"系统观察自己"这一类：记下"我被意外了"却没记被什么意外（431 条）、意图树更新了没记为什么（177 条）、发现自己漂移了没记怎么发现的（82 条）、记下一次纠正却没记纠的是什么（6 条）。</p>
+
+<p><b>系统干活的痕迹是连的，系统认识自己的痕迹是断的。</b> 而后者正是 <a href="#u10">U10</a> 和 <a href="#u19">U19</a> 要靠的那部分。</p>
+</div>
+</div>
+
+<div class="uc" id="u8">
+<h3>U8 · 我要能查"这件事<u>为什么没</u>发生"</h3>
+
+<span class="seg">我要做的</span>
+<p>问「这件事为什么<b>没</b>发生」。</p>
+
+<span class="seg">我应该体验到</span>
+<p><b>没做的事，和做了的事一样留痕。</b></p>
+<p>系统决定不做、决定推迟、把两件事当成一件、把一个请求丢掉——<b>这些决定本身要留下来，还要留下它当时凭什么这么定。</b></p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p>我先说「装 numpy 2.1.0」，过一会儿又说「装 2.2.0」。回来一句「好了」。</p>
+<p>装上的只有一个。系统觉得这两句话像得够多，当成了同一件事，<b>把后一句直接扔了——扔的时候一声没吭。</b></p>
+<p>我不放心，回头把那两天的记录从头翻到尾，找有没有哪一行写着"合并""重复""丢掉"这类字眼：<b>一行都没有。</b> 记录通篇是绿的——请求收到了、活干完了、没有报错、没有警告。<b>那件没发生的事，在记录里也没发生。</b></p>
+<p>同一个毛病还吞过别的：<b>两笔转账，500 元和 800 元，只走了一笔。</b> 我要是不去对账，这件事永远不会有人提。</p>
+<p>而它最后是怎么露出来的——<b>有人去读了那段代码</b>，看见了那句"够像就算一件事"。<b>一个非得读代码才能发现的毛病，等于根本没留痕。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>旧系统里有一处判断，两个请求文字够像就当成同一个，后来那个静默消失。实测被吞掉的：numpy 2.1.0 和 2.2.0（像 95.5%）、PR #412 和 #418（94.1%）、周报 08-04 和 08-05（94.1%）、转账 500 元和 800 元（90.9%）——<b>一声不吭。</b></p>
+<p>它最后是被人去读代码读出来的，不是被查出来的。<b>一件事没发生，本来就是最难查的一种事；而它恰好最不留痕。</b></p>
+</div>
+</div>
+
+<div class="uc" id="u9">
+<h3>U9 · 我要一眼看见有意义的事，不被心跳淹掉</h3>
+
+<span class="seg">我要做的</span>
+<p>看看最近都发生了什么。（也要能要求"把<span class="gloss">心跳<span class="tip">系统每隔一段时间自动往记录里写的一条"我还在"。它本身不说明发生了什么，但它一旦停了，正好说明系统死了——所以不能简单藏掉。<span class="src">本项目 requirements/trace.md U9</span></span></span>也给我看"，但那不该是默认。）</p>
+
+<span class="seg">我应该体验到</span>
+<p>翻开就是"发生了什么"，不是一屏又一屏每两分钟一条的自动心跳。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p>我想知道这两天都发生了什么。翻开——心跳、心跳、心跳。我往下滚了三十屏，<b>还是每两分钟一条的心跳</b>。滚到第五屏我其实已经不在看了，只是在滚。</p>
+<p>那个月真正值得看的一共 194 条。<b>它们就在这一万两千条中间，我一条也没碰上。</b></p>
+<p>而这份记录<b>没有坏</b>：一条不缺，每一条都对，看上去比什么时候都完整。<b>恰恰是"它很完整"这件事，让我一直相信"想查的时候查得到"。</b></p>
+<p><b>另一头是"那就把心跳藏干净"</b>：藏干净之后，"心跳停了"这件事也跟着看不见了——<b>而心跳停了，正是唯一能告诉我"它死了"的东西。</b> 从此安静有两种意思，我分不出是哪一种。</p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>旧系统 8 月记了 <b>12862</b> 条，其中 <b>98.5% 是自动产生的</b>——触发器自己记账 5450、时钟到点 5357、定期搬运 1504、主动思考的两类记账 357。</p>
+<p><b>值得一看的，一整个月只有 194 条。</b></p>
+<p>这 194 条里，<b>"你说了一句话"占 5 条</b>。<b>同一个月，它给时钟记了 5357 笔。</b></p>
+<p><b>一份 98.5% 是噪音的记录，和没有记录差不多——区别只在于它还占着 89MB。</b></p>
+<div class="note">
+<span class="nl">⚠ 这个数改过两次，把过程留下</span>
+<p>先写 12794 / 95.8%（粗算），再改成 12828 / 96.8%（一次基线测量，<b>分项与小计相加对不上，虚高了约 220 条</b>），2026-08-10 第三次实测得到现在这组。<b>分项摆在眼前却没相加核一遍，是这次的教训。</b></p>
+</div>
+</div>
+</div>
+
+<div class="uc" id="u10">
+<h3>U10 · 系统自己也读这份痕迹</h3>
+
+<span class="seg">我应该体验到</span>
+<p><b>我对它的了解，和它对自己的了解，来自同一份东西。</b></p>
+<p>不会出现"文档里写它这么干"和"它实际那么干"是两回事。它反思自己、总结自己、改自己，凭的是这份痕迹，不是凭一份人手写的自我介绍。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p>我问它「你是怎么决定哪些事要先问我一声的」。它讲得很清楚，条理分明，我听完就放心了。</p>
+<p>它讲的是<b>一份写在文档里的自我介绍</b>。那份介绍半年前是对的；实际的做法三个月前改过一次，改的人没回来改这份介绍。</p>
+<p><b>它不是在骗我，它真的这么以为。</b> 我也没法从哪儿看出异样——<b>它答得越顺，我越信。</b></p>
+<p>这两件事分家的那一天，<b>什么动静都没有</b>。我最后是这么发现的：某天它做了一件按它自己讲的那套明明不该做的事，<b>而我的第一反应是怀疑我自己记错了。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>这是 VISION 里写死的一条——"这种日志是给系统自己看的，所以格式上要对系统友好"。而旧系统的自我认知是手写在文档里的：<b>一份手写的自我认知，和实际行为之间没有任何东西保证它俩一致；不一致的时候，也没有任何东西会喊一声。</b></p>
+</div>
+</div>
+
+<div class="uc" id="u11">
+<h3>U11 · 我要它一年后还能用</h3>
+
+<span class="seg">我应该体验到</span>
+<p>痕迹会一直长，这没办法。但<b>翻它的代价不能跟着一直涨。</b></p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p>我想问一件很小的事：这四个词在我的记忆里出现过没有。我拿这四个词挨个去搜整份记忆，然后等。<b>两分钟过去，什么都没回来，我自己把它掐了。</b> 换一个小得多的范围重问一遍，才拿到答案。</p>
+<p>这件事今天真发生了，而且发生了两回，就在写这份文档的时候——第二回是想数一数这份记录一共有多少字，<b>同样两分钟没回来，同样只能作罢。</b></p>
+<p><b>没有任何东西坏了</b>：记录全在，问法也对，它只是慢到我不会再问第二遍。于是我的习惯变了——以后想查什么，我先在心里估一下值不值得等，<b>大部分时候答案是不值得</b>。一份没人愿意翻的记录，和没有记录差不多。</p>
+<p>而它一天也没停过：写下"105 天 89 MB"到今天，<b>我重新量了一遍，115 天、93 MB</b>（量的是文本本身，不是它占了多少盘——这个坑 <a href="#u14">U14</a> 底下踩过一次）。</p>
+<p><b>另一头是"那就定期把旧的删掉"</b>：删完之后我问一件去年的事，它答"没有记录"。<b>这句话和"这件事根本没发生过"长得一模一样</b>——我分不出是本来就没有，还是被我自己清掉了。</p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>三处同一个病。① 旧账本 105 天 89MB，还在长；② 另一份只补记、从不删的文件涨到 589KB，"只留最近几条"的规矩至今没定；③ <b>启停模块自己也留着这个缺口</b>（★3：输出文件只追加、不轮转）。</p>
+<p><b>三个地方各自独立地得了同一个病，说明这不是疏忽，是默认结局。</b></p>
+</div>
+</div>
+
+<div class="uc" id="u12">
+<h3>U12 · 我不需要谁「记得」去留痕</h3>
+
+<span class="seg">我应该体验到</span>
+<p>事情发生了，痕迹就在。<b>不靠哪个人、哪个 agent 记得多敲一条命令。</b></p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p>昨天我跟它聊了一整轮，问题问了，答复也拿到了，很顺。今天我接着往下说：「按昨天讲的那个办法办。」</p>
+<p>它问我：<b>「哪个办法？」</b></p>
+<p>在它那边，昨天那一轮<b>从来没有发生过</b>。回复的那一半做了，记账的那一半忘了。而昨天当时我一点异样都感觉不到——<b>回复是好的，对话是顺的，没有任何一处报错。</b></p>
+<p><b>后来打的补丁更值得看</b>：办法是在叮嘱里加一句"记得要记"。管用了一阵子，<b>然后某一次又忘了。</b> 我说不出是哪一次——<b>忘掉的那一次，恰好就是没留下痕迹的那一次。</b> 这种漏只能等下回撞上才知道，撞不上就一直不知道。</p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>旧系统里，"回复用户"和"把这件事记下来"是两个动作。负责回复的那个副本经常做完前一个、忘了后一个。结果是——<b>对用户来说这轮交互发生了，对系统来说它从没发生过。</b></p>
+<p>后来的办法是在提示词里硬写"必须记得"。<b>用一句叮嘱去堵一个结构问题，是在赌运气，而且每一次都要重赌一遍。</b></p>
+<blockquote>这八条里，<b>U12 是唯一一条「写」的，其余七条全是「读」</b>。这个比例不是巧合：读的需求容易想到，写的需求要等它漏了才被发现。</blockquote>
+</div>
+</div>
+
+<div class="uc" id="u13">
+<h3>U13 · 旧的记忆整个接进来，不留在墙那边</h3>
+
+<span class="seg">我要做的</span>
+<p>问一件很早以前发生的事——<b>用问今天那件事完全一样的方式。</b></p>
+
+<span class="seg">我应该体验到</span>
+<p>我问一件事，<b>不用先想它发生在新旧分界线的哪一边</b>。同一个问法，同一份痕迹。</p>
+<p>旧 memory 不是"归档"、不是"参考资料"。<b>它就是这个系统记忆的一部分</b>，搬完之后仍然是活的。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p>我想起一件三月定下来的规矩，想问一句。<b>话到嘴边我先卡了一下：三月那会儿还是旧的那套。</b></p>
+<p>于是我做的第一件事不是问，是先判断这事该去哪边问。判断错了，再问一遍。</p>
+<p><b>麻烦的是问错了我也不会知道</b>：我问新的这边，它说"没查到"。这句话在"确实没这回事"和"这条在墙那边"两种情况下<b>是同一句话</b>。我拿到一个否定的答复，而它可能只是我问错了地方。</p>
+<p><b>另一头是"搬进来了就当它一样好用"</b>：我照查今天那件事的法子，往回查一件三月的事。链子确实一步不缺，一路通到底——<b>落在"因为两分钟到了"。</b> 搬得进来的是记录和链子，<b>搬不进来的是"这条链子有意义"</b>。要是不把这句话明写出来，我会以为分界线两边一样查得动，<b>然后拿一个什么也没查出来的答案当结论用。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>到今天为止已经攒了 105 天、139586 条事件、15G 对话。<b>要是 V2 只从今天开始，那我未来一年里每一个"为什么"都可能撞墙</b>——而且撞上的时候，我还得自己判断"这事该去哪边查"。<b>这正是 <a href="#u2">U2</a> 里那条病：顺序只存在于我脑子里。</b></p>
+<div class="note">
+<span class="nl">诚实的限制（必须写在这儿，不许含糊）</span>
+<p>接进来的这批，链子大体是连的（真断的只有 0.2%），<b>但 78.8% 的链子查到底落在"时钟到点"</b>——那是个合法起点，可它答不了"为什么"。</p>
+<p>所以 <a href="#u7">U7</a> 那句"一直查到一个我认得的起点"，<b>在分界线之前只有 17.4% 能真正做到</b>。能给的是"记录在这儿、链子也在"，给不了"这条链子有意义"。<b>不能让它看起来像做到了。</b></p>
+</div>
+</div>
+</div>
+
+<div class="uc" id="u14">
+<h3>U14 · 换个 agent、换个会话，它还记得我们聊过什么</h3>
+
+<span class="seg">我应该体验到</span>
+<p>我在这台机器上跟<b>任何一个</b> agent 说过的话，都进同一份痕迹。</p>
+<p>换 agent、开新会话、上下文用光了重开——<b>新的那个接得上，我不用重讲一遍</b>。我也不需要记得"上次是跟谁说的"，我只说"我上次讲过的那个事"，它就该找得到。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>第一种</b>：上下文用光了，我开一个新会话。新的那个一上来干干净净——<b>干净得像我从来没跟它说过话。</b> 我说"接着昨天那个做"，它问"昨天哪个"。这台机器上收着的那一大堆对话就在原地躺着，<b>对刚开的这个来说等于不存在。</b></p>
+<p><b>第二种更难看出来</b>：我从另一份索引里挑了四个词，挨个到 Theseus 自己那份记忆里去问。头两个问得出来，我心里一松——<b>这份记忆是全的。</b> 后两个，<code>firecrawl</code> 和 <code>chubbyskills</code>，<b>一个字也问不出来。</b></p>
+<p>而这四条在那份索引里是并排放着的，<b>长得一模一样，没有任何东西标出后两条是缺的</b>。我要是只碰巧问了头两个，我会带着"它全都记得"这个结论走开，<b>而且从此不再核。</b></p>
+<p><b>这不是"记忆是空的"那种坏，是"记忆只有一半"。</b> 空的我一眼就不会信；一半准的，我会信，然后在某个我没法预料的地方被它坑一次——<b>到那时我的第一反应还是"我自己记错了"。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>① <b>记录其实已经在收了</b>——本机 15G 对话，claude / codex / deepseek / hermes 四家都在收。<b>但收着不等于记得</b>：新会话一开，那 15G 对它等于不存在。</p>
+<p>② 每个 agent 又各自造了一份自己的记忆——Claude Code 在 <code>~/.claude/projects/&lt;项目&gt;/memory/</code> 下就有一份。</p>
+<p><b>并存本身不是问题</b>（2026-08-08 游渊定：这些删不掉，允许长期共存；"本地不保留第二个持久知识库"那条说的是 PKM，不是它们）。<b>问题是 Theseus 这份必须是最全的那一份</b>——而现在没有任何东西保证它是，也没有任何东西会在它变得不全时喊一声。</p>
+<p><b>这不是担心，是已经发生了</b>：从 Claude 那份索引里随手挑四条，去 Theseus 自己的记忆里找——<code>taildrop</code>、<code>cloudzy</code> 找得到，<b><code>firecrawl</code>、<code>chubbyskills</code> 一处都没有。</b></p>
+<div class="note">
+<span class="nl">顺带暴露了另一件事</span>
+<p>这个核查只查得动小的那部分（<b>纯文本 5.87 MB</b>）；大的那部分有 17G，<b>扫不动，只能作罢</b>。"想查一遍要多久"本身就是 <a href="#u11">U11</a> 说的那个病。</p>
+<p><b>⚠ 这个数原来写的是 28M，错了，2026-08-16 改正。</b> 28M 是 <code>du</code> 报的<b>磁盘块占用</b>——那底下 2514 个小文件，块对齐把真实的 5.87 MB 撑到了 28 MB（连非文本一起算也只有 19.51 MB）。<b>量的是"这堆东西占了多少盘"，报的是"文本有多少字"，偏了 4.8 倍。</b> 错的一方是我。留着，因为它是同一类毛病里最干净的一个例子：<b>别量装东西的容器。</b></p>
+</div>
+<p>③ 那份自己造的索引里，眼下还写着"⚠️路径存疑""下次要用时先重新定位"——<b>一份需要人提醒"这条可能不准"的记忆，本身就说明它不可靠。</b></p>
+<p><b>这条比 <a href="#u7">U7</a> 难，难在一个地方</b>：U7 是<b>我主动去查</b>，U14 是<b>我没问，它就该已经知道</b>。后者意味着必须有东西替我判断"什么算相关"。这是这八条里唯一真的需要"找相关内容"的地方。</p>
+</div>
+</div>
+
+<h3>一件没写成用例的事：痕迹不能丢、不能重</h3>
+
+<p>作者想写，但按"必须说得出它真出过什么事"那条规矩，说不出它在这个项目里真出过什么事，所以不给它用例的位置。</p>
+
+<p>而且它本来也不是"一个人要干的事"。它是上面<b>八条全部</b>能不能成立的<b>前提</b>：痕迹一旦丢了或重了，U7 到 U14 会<b>同时悄悄变成错的，而表面上一切正常</b>。</p>
+
+<div class="lede">
+<b>"坏了还长得像好的"是这套系统迄今最贵的失败方式</b>——2026-08-05 宣布旧系统已停，用的证据是"记录不再增长"；那条证据在"真停了"和"我看的窗口太短"两种情况下都成立，而当时是后者，之后又写进去 269 条。
+</div>
+
+<p>所以这件事归到技术实现那边当硬约束，不占用例的位置。</p>
+
+<h2 id="g3">五、意图树 · U15–U19 —— 我在追什么</h2>
+
+<div class="lede">
+这一组管的是<b>方向</b>：我此刻在追什么、它从哪来、散出去的分支怎么不丢、跳走了怎么回来、两条线怎么并、我纠正它的那些话怎么不白纠。<br>
+<b>这棵树不是另存一份东西，它是从痕迹里看出来的</b>——意图是因，发生的事是果；因果本来就在痕迹里，这棵树只是把"因"那一侧显出来。<b>所以不会出现"树上写的"和"实际发生的"是两回事。</b>
+</div>
+
+<div class="note">
+<span class="nl">树上的节点是"我"的意图</span>
+<p>agent 提的东西<b>不自动成为节点——只有我接了它，它才是</b>。</p>
+<p>由此推出一条：<b>agent 问了、我没答，那不是树上的洞。</b> 它是关于 agent 的信号，三种可能——上下文没给够、没讲清楚、或者这事本来就不重要。<b>三种都是 agent 该改的地方，不是我该补的作业。</b></p>
+</div>
+
+<h3>为什么是树</h3>
+
+<p>游渊的原话：「每件事确实后面有一个<b>起始动机</b>，有发展，也可能会和别的想法<b>融合</b>。」</p>
+
+<p>这句话里有两件都为真、但互相打架的事：<b>起始动机唯一</b>（是树），<b>融合</b>（把树破了——一个东西有了两个来头）。</p>
+
+<p><b>解法：树说的是出身，不是现在的关系。</b></p>
+
+<ul>
+<li><b>出生</b>：每个意图有且只有一个"它是从哪儿分出来的"。这些关系构成一棵真正的树。</li>
+<li><b>融合</b>：后来才发生的另一种关系，<b>不改出生地</b>。</li>
+</ul>
+
+<p>这样两边都保住了：融合能如实记下来，而"我现在在追什么、它从哪来"<b>永远只有一条路</b>——那正是这棵树唯一不可替代的地方。列表说不出"从哪来"；网说得出，但说不出<b>唯一的</b>一条，于是看不出"我在哪"。</p>
+
+<blockquote><b>一条删掉的需求</b>：VISION 里那句「分叉走远时主动提醒回归」——<b>2026-08-08 游渊定：不要。</b> 而且"远"本来也没定义清楚（层数深？时间久？还是跟根意图的关系淡了？）</blockquote>
+
+<div class="uc" id="u15">
+<h3>U15 · 我随时知道自己在追什么、它从哪来</h3>
+
+<span class="seg">我应该体验到</span>
+<p>任何时刻，<b>一句话就能说清我在追什么，以及它是从哪个更大的念头分出来的</b>。这句话不用我自己想，它就摆在那儿。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头，是它替我编了一句。</b> 每次开口它都先告诉我"你现在在追 A，A 是从 B 分出来的"。读着很顺，我从来没觉得不对。</p>
+<p>但这句话是另写的一份，不是从真发生过的事里看出来的。<b>我去数过旧的那棵树：231 条里，指得回一条真痕迹的只有 173 条——剩下 58 条，指不回任何东西。</b> 一棵号称"从发生过的事里看出来的"树，凭空多出 58 条。</p>
+<p>所以那句"你在追什么"里，中间某一段很可能是它替我接上的。<b>而我发现不了——它写得比我自己说得还整齐。</b></p>
+<p><b>另一头，是同一件事有两个名字。</b> 我问"我在追什么"，它给我一个说法；我去当初记下的地方找，写的是另一个说法。是不是同一件事，得我自己认。</p>
+<p>这也是量出来的：旧那棵树，和那份从它拉平出来的清单，<b>拿标题一条条对，对不上的有 46 条和 33 条</b>——全因为清单里被重写成了简称。<b>同一件事两个名字，就等于没法核对。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>光这一次会话就走过——停旧系统 → 启停该怎么设计 → 人类史上怎么解决 → 换地基 → 写需求 → 沉淀经验 → 痕迹 → 意图树。<b>七跳。</b> 中间没有任何一跳是错的，但走到第七跳时，<b>"我们当初为什么开始"这句话已经没人答得上来了</b>，除非往回翻。</p>
+<p>这也是项目规矩里为什么要求每次回复开头写出这条路径——<b>那条规矩就是这个需求的手工版</b>。</p>
+</div>
+</div>
+
+<div class="uc" id="u16">
+<h3>U16 · 我散出去的分支不会丢，想捡的时候捡得回来</h3>
+
+<span class="seg">我应该体验到</span>
+<p>一个念头开了头没走完，<b>它不会消失</b>。我哪天想起"当时好像还有个什么"，就该找得到——<b>包括它当时长到哪一步、旁边在聊什么。</b></p>
+<p><b>不需要有人催我收尾。</b> 分支本身就有价值，<b>没走完不等于没用</b>（2026-08-08 游渊：「总有些树的节点被漏掉，但是我觉得这些分支也有价值」）。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头，是一份看起来很负责的名单。</b> 为了不让分支丢掉，有一份"所有没走完的都在这儿"的清单。我信它——它的名字就叫防丢。</p>
+<p>我数过一遍：<b>树上没走完的有 109 条，清单只有 96 行，里面还混着 2 条早就做完的。</b> 也就是说<b>至少 15 条它声称永不丢的，就那么没了</b>——没被标成不做了，也没被标成做完了，只是不在名单上。</p>
+<p><b>最坏的地方不是漏，是我不会去查。</b> 一份叫"防丢"的名单摆在那儿，我打开扫一眼，觉得都在，就合上了。<b>它替我做完了那件我本来该做的检查。</b></p>
+<p><b>另一头，是名单什么都不漏。</b> 开过头的一条不落全在上面，一年下来四百条。<b>我打开，扫两眼，关掉。</b></p>
+<p>从我这儿看，这和那 15 条丢掉没有区别——<b>它们都不会再被我捡起来。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>VISION 里写着「子意图悬空没人收尾，切走的意图回不来」，并且注明这个需求<b>「在多次真实交互中独立、反复涌现」</b>——反复自发涌现本身就是最强的信号。</p>
+<p><b>一个诚实的观察</b>：去翻眼下能找得到的悬着的东西，找到的<b>全是已经被写下来的那些</b>——AGV 消失的 bug 暂搁、Bevy demo 黑屏待解、判例账缺一种事件待补、闲置索引膨胀待定规矩。<b>看不见的那些我找不到，正因为它们看不见。</b></p>
+<p>这恰好说明这条要的是什么：<b>不是催，是让分支留下形状。</b> 写下来的那几件之所以还在，靠的不是谁记性好，是它们<b>留下了形状</b>。</p>
+</div>
+</div>
+
+<div class="uc" id="u17">
+<h3>U17 · 跳走了，我能回来</h3>
+
+<span class="seg">我应该体验到</span>
+<p>临时跳去别的事，回来时<b>接着刚才那儿走</b>，不用重新把自己装回当时的状态。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头，是接上了，但接的是半截。</b> 我跳去别的事，两周后想回来。打开当初留下的那份交接——写得挺全，做到哪一步、下一步做什么都有。<b>唯独没有"当初为什么选这条路"。</b></p>
+<p>我照着往下做了一天，做完才想起来：当时选这条路是有个前提的，而那个前提上个月已经变了。<b>这份交接把我送回了原地，却没把我送回当时的判断。</b></p>
+<p>那次至少还有一份。<b>别的几次没人想起来写，那几件事就真的回不去了</b>——而"这次没写"在当时不会有任何地方提醒我，<b>我是两周后想回去，才发现没得回。</b></p>
+<p><b>另一头，是它替我恢复得太多。</b> 我说一句"回到上次那件事"，它把当时前后聊过的一股脑推到我面前，<b>包括我当时试过一次、已经放弃的那条路</b>。</p>
+<p>放弃的和在做的长得一模一样——都是我当时说过的话。我挑了一条又走了一遍，走到头才想起来：<b>这条我半年前走过，也是走到这儿发现不行的。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>现在的办法是<b>人手写一份交接文件，还得记住一串会话编号</b>（<code>handoff-20260611-session-3cc78184</code>）。<b>一件事需要人手写交接才能接上，说明这个系统没在替你记着。</b></p>
+</div>
+</div>
+
+<div class="uc" id="u18">
+<h3>U18 · 两件事原来是一件，我要能把它们并起来</h3>
+
+<span class="seg">我应该体验到</span>
+<p>我发现两条线其实在做同一件事，<b>说一句就能并</b>。并完之后，<b>两边各自从哪儿来仍然查得到</b>——不是把其中一条抹掉。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头，是并的时候把出身抹掉了。</b> 两条线并成一条，从此系统里只有一件事，干干净净。</p>
+<p>半年后有人问："这份研究为什么要同时对两个方向负责？"——我答不上来。<b>记录里它天生就是一件事</b>，看不出它曾经是两个念头、各自答应过不同的人。那两边当初答应过的东西还在，只是没人知道它们是从哪条线带过来的。</p>
+<p><b>做的时候一切正常，要跟人交代的时候才发现交代不了。</b></p>
+<p><b>另一头，是并不了。</b> 我明明看出这两条在做同一件事，但没有"并"这个说法，我只能挑一条接着走，另一条搁在那儿。</p>
+<p>于是<b>同一个内核两边各写各的</b>。一开始只是重复干活，后来两份的说法开始不一样。<b>等我发现的时候，已经分不清哪份是对的。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>真发生过。道路管养的本子和 LLMAD 那份研究，最后是<b>一份研究出两个本子</b>、共用同一个内核。它们一开始是两个独立的念头，是走到中间才发现能并。</p>
+<p><b>要是并的时候丢掉了"它俩本来是分开的"这个事实，将来就说不清为什么这份研究要同时对两个方向负责。</b></p>
+</div>
+</div>
+
+<div class="uc" id="u19">
+<h3>U19 · 它越来越懂我，而且我纠正它不白费</h3>
+
+<span class="seg">我应该体验到</span>
+<ul>
+<li>它每次把"我在追什么"讲出来，我<b>一眼看得见</b>——所以它讲错了我才会开口</li>
+<li>我一句话就能纠</li>
+<li><b>纠过的不白纠</b>：它猜错了什么、我改成了什么，<b>都留得下来，将来取得出来</b></li>
+</ul>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头，是我没吭声被当成了点头。</b> 它问了一句"你接下来大概是想把验收也写了？"——我在忙别的，没回。</p>
+<p>第二天我看那棵树，上面多了一条「写验收」。<b>我从来没点过头。</b> 而它长得和我亲口说的那些一模一样，我扫过去只会觉得"嗯，是有这么回事"。</p>
+<p>这不是假想：旧那棵树 231 条，<b>说得出"这是我说的"的只有 85 条</b>，剩下三分之二是怎么上去的，现在查不出来了。我还专门去翻过，想找一条记着"这是它提的、我没答"的——<b>一条都没有，那棵树里根本没有这种写法。</b> 我不吭声这件事本身，一次都没被记下来过。</p>
+<p><b>另一头，是我纠了它，纠完就没了。</b> 我说某个名字不合规矩，它当场改对，我很满意。</p>
+<p>两周后换个地方接着聊，同一个名字又冒出来。我再说一遍，它又当场改对，<b>我又很满意</b>。</p>
+<p><b>每一次单看都是好的</b>——它从善如流，我一句话就纠过来了。只有把几次摆在一起才看得出：<b>它没变准，是我在一遍遍教同一件事。</b> 而我自己都数不清这是第几遍，只会隐约觉得"这个我好像说过"。</p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>① <b>这是"越来越懂我"眼下唯一的落地物。</b> 不是说以后也不造一个正经的"用户模型"，是<b>暂缓</b>——<b>现在造不出终极形态，得靠迭代长出来</b>（2026-08-08 游渊定）。所以这棵树同时是两样东西：<b>今天那个模型的可见形态</b>，以及<b>将来那个模型的原料</b>。看不见的理解没法纠，纠不了就不会变准，不变准就长不出下一版。</p>
+<p>② <b>免费的信号，现在天天在扔掉。</b> 光这一次会话，我就被纠正了至少三次：<code>supervisor</code> 这个名字不合规矩、"事件表"该叫痕迹、"不保留第二个知识库"说的是 PKM 不是别的。<b>三次都被当场吸收了，三次都没留下任何取得出来的东西</b>——它们只活在这段对话里，而这段对话<b>已经被压缩过一次</b>。</p>
+<p>③ <b>猜测本来就在发生</b>，一天几十次（项目规矩要求每轮回复开头写出那条路径）。<b>猜在发生，纠也在发生，只是没人把这对东西捡起来。</b></p>
+<p>④ <b>我不吭声，也是信号。</b> agent 问了我没答，说明三件之一：上下文没给够、没讲清楚、这事本来不重要——<b>三种都指向 agent 该改哪里</b>。这类信号比"出言修正"更多、更便宜，<b>而且现在一条都没被捡。</b></p>
+<p>这条对"看得见"和"取得出来"的要求不是一回事，得分开满足：颜色是给眼睛的——看不见我就不会纠；某种固定的记号是给机器的——<b>留在记录里、将来从一堆对话里能捞出来的，是记号不是颜色。</b></p>
+</div>
+</div>
+
+<h2 id="g4">六、环 · U20–U24 —— 它自己动起来</h2>
+
+<div class="lede">
+前三组各自都对，<b>但它们之间没有任何东西在动</b>，每一步都得人推。这一组把环闭上：<b>事情发生 → 留痕 → 有东西看见了 → 动手 → 又留痕。</b><br>
+<b>这不是"还没做完"，是"做的这些还不构成一个系统"。</b>
+</div>
+
+<div class="dgm">
+  <div class="cap-top">今天的三块　→　环闭上之后</div>
+  <div class="dflow">
+    <div class="dnode"><div class="t">事情发生</div><div class="s">我说一句 / 到点了</div></div>
+    <div class="dconn"><span class="g">══▶</span><span class="lbl">留痕<br>U12</span></div>
+    <div class="dnode"><div class="t">痕迹</div><div class="s">U7–U14</div></div>
+    <div class="dconn"><span class="g">┄┄▷</span><span class="lbl">今天<br>断在这</span></div>
+    <div class="dgroup"><span class="glab">U20–U24 要补的那一块</span>
+      <div class="dnode key"><div class="t">有东西看见了</div><div class="s">U20 该动的自己动</div></div>
+      <div class="dnode"><div class="t">该问的先问我</div><div class="s">U21 · 关卡自己也受检验 U22</div></div>
+      <div class="dnode"><div class="t">动手（起 / 停 / 派活）</div><div class="s">回到启停 U1–U6</div></div>
+    </div>
+    <div class="dconn"><span class="g">══▶</span><span class="lbl">又留痕<br>成环</span></div>
+  </div>
+  <div class="legend">
+    <span class="it"><span class="sw" style="background:var(--dg-struct)"></span>已有</span>
+    <span class="it"><span class="sw" style="border:1.3px dashed var(--ink3);background:var(--card)"></span>缺这一块</span>
+  </div>
+  <div class="cap">图 3　环缺的那一块。<b>痕迹记下来了，没有任何东西在看；启停能把东西起起来，没有任何东西决定该起什么。</b> 结果是人成了那根连线。<br>注意最后那条回边——<b>它动手又会留痕，而痕迹正是让它动手的东西</b>，这就是 U23 要防的那条自己喂自己的路。</div>
+</div>
+
+<div class="note">
+<span class="nl">分级是定下来的（2026-08-16 游渊定）</span>
+<p><b>小事自己做，大事先问。</b> 划线按"<b>能不能撤</b>"——不是按重要性，不是按耗时。理由见 <a href="#u21">U21</a>。</p>
+</div>
+
+<div class="uc" id="u20">
+<h3>U20 · 事情发生了，该动的自己会动</h3>
+
+<span class="seg">我要做的</span>
+<p>把一件事说出来，或者让一件事发生。<b>然后不管它。</b></p>
+
+<span class="seg">我应该体验到</span>
+<p><b>该动的自己动了。</b> 我不需要再去点一下、催一句、或者记得"哦对，还得让它去做那个"。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p>我说一句「把这周开销汇总一下」。<b>两份汇总回来了，内容还不一样。</b></p>
+<p>因为有两个地方同时看到了这句话，各派了一个 agent，它们各跑各的。更糟的是它们同时改同一个文件，后写的盖掉先写的，<b>我拿到的是个半成品</b>。</p>
+<p>而记录里两条都写着「我做完了」——<b>我事后想查清楚是怎么回事，也分不出哪份是哪个干的。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>现在环是开的。<b>痕迹记下来了，没有任何东西在看；启停能把东西起起来，没有任何东西决定该起什么。</b> 结果是我成了那根连线——每一步都得我推。</p>
+<p><b>这不是"还没做完"，是"做的这些还不构成一个系统"。</b> 三块各自都对，合起来不干活。</p>
+<p><b>而且旧系统证明了这一块一旦做错，代价是什么</b>：曾经有一次，看着痕迹的那部分每次都把整本账从头读一遍，<b>把派活的那部分活活饿死</b>。环转起来了，但转的全是空转，真正该干的活排在后面动不了。</p>
+<blockquote><b>所以这条用例的成立条件不是"它动了"，是"它动的是对的那件事"。</b></blockquote>
+</div>
+</div>
+
+<div class="uc" id="u21">
+<h3>U21 · 撤不回来的事，先问我一声</h3>
+
+<span class="seg">我要做的</span>
+<p>什么都不做。</p>
+
+<span class="seg">我应该体验到</span>
+<p><b>能撤的它直接做了，撤不回来的它先出现在我面前。</b></p>
+<p>划线按<b>能不能撤</b>：</p>
+<ul>
+<li><b>能撤</b>：读东西、算东西、写进痕迹、在自己家里挪文件、起停自己的部件——<b>直接做，留痕就行。</b></li>
+<li><b>撤不回来</b>：发出去（消息、邮件、贴文）、删东西、花钱、动别人的机器、改我的配置——<b>先问。</b></li>
+</ul>
+<p><b>不是按重要性划，也不是按耗时划。</b> 一件很重要但能撤的事，让它做；一件很小但撤不回来的事，先问。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p>我睡一觉起来，发现它<b>替我发出去一封信</b>。信的内容不算错，但那不是我会发的措辞，而且<b>收信的人已经看到了</b>。</p>
+<p>或者更安静的一种：<b>某个目录被清理掉了</b>，理由写得很合理——"这些是过期的中间产物"。其中一份是唯一副本。</p>
+<p>两种情况的共同点是：<b>记录很完整，我事后查得一清二楚，但那件事已经收不回来了。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p><b>2026-08-17 这一轮里就发生了两次，而且两次的处理不一样：</b></p>
+<p>① 我要起一个对外监听的服务，<b>被拦下来了</b>——那件事我不该自己决定，拦得对。改成把命令交给人敲。</p>
+<p>② 我要重启一个进程，<b>它会打断正在跑的五个服务</b>。我先问了，得到答复才动。</p>
+<p><b>两次都不是"判断得好"，一次是有东西拦着，一次是恰好想起来问。</b> 靠"恰好想起来"守不住。</p>
+<p><b>而且这条线必须画在"能不能撤"上，理由很实</b>：一件事做错了，只要撤得回来，代价是时间；撤不回来，代价可能是别人收到了一封不该收到的信、或者一份唯一的副本没了。<b>时间可以再花，那两样不能。</b></p>
+</div>
+</div>
+
+<div class="uc" id="u22">
+<h3>U22 · 那道关卡，自己也得受检验</h3>
+
+<span class="seg">我要做的</span>
+<p>回头看看，<b>它这段时间一共问了我几次。</b></p>
+
+<span class="seg">我应该体验到</span>
+<p>这个数<b>我看得见</b>，而且<b>数不对的时候我知道是划线划错了，不是我不够专注</b>。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>第一种死法</b>：它一天问我十七次，其中十五次是显然该做的小事。<b>到第三天，我看见弹出来就点同意，根本没读。</b></p>
+<p>关卡还在，拦截还在记录，报表上「人工确认率 100%」——<b>但它已经不起作用了。哪天真有一件不该做的事混进来，我照样点同意。</b></p>
+<p><b>第二种死法更安静</b>：它一个月一次都没问过。<b>我以为它在把关，其实是划线划得太窄，或者那道关卡压根没接上。</b> 我不会发现，因为"没被打扰"感觉起来和"一切正常"一模一样。</p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p><b>这就是这套系统里已经点过名的那种病：一个检验被形式满足。</b> 章盖了，事没做。</p>
+<p><b>所以这条关卡必须自己带一个量</b>：问得太频，说明"撤不回来"这条线划得太宽；<b>长期一次都不问，同样可疑</b>。</p>
+<p><b>两头都要看。</b> 一个从不说"不"的检验，和一个天天冤枉人的检验，<b>一样没用</b>。</p>
+</div>
+</div>
+
+<div class="uc" id="u23">
+<h3>U23 · 它不许把自己转起来</h3>
+
+<span class="seg">我要做的</span>
+<p>睡觉。</p>
+
+<span class="seg">我应该体验到</span>
+<p><b>我不在的时候，它不会自己把自己越转越快</b>；同样，<b>也不会因为一次外部抖动就整晚罢工</b>。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>一头</b>：我睡醒发现它转了一夜。每一次动手都留了痕，而痕迹又让它动手——<b>它自己喂自己</b>。账单是真的，而它一晚上什么有用的事都没做成。</p>
+<p><b>另一头，同样糟</b>：某天服务商限流了半小时。这半小时里它试了二十次，每次都因为限流退出。<b>如果这被算成"失败"，二十件活会被一起判成"反复失败、已停下"。</b></p>
+<p>限流过去之后<b>系统不会自己恢复</b>——那二十件活已经被判死了。<b>我第二天打开，看到二十个停在那儿的，还得一个个手动放行。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p>环闭上之后，<b>它做的每件事都会留痕，而痕迹正是让它动手的东西</b>。所以天然存在一条自己喂自己的路。</p>
+<p>这不是假想。<b>旧系统 8 月记的 12862 条里，98.5% 是自动产生的</b>——触发器自己记账 5450 条、时钟到点 5357 条。<b>那时候动手的还只是"记一笔"，就已经是这个量。</b> 一旦动手意味着派一个 agent 去干活，同样的自动增长会带上真实的算力和钱。</p>
+<p><b>而另一头的证据来自外面</b>：2026-08-17 拆开 Hermes 的调度看，它专门给"因为限流退出"留了一条<b>不算失败</b>的路，理由写在代码里——<b>一个长的限流窗口能把熔断器打穿</b>。</p>
+<p><b>所以这条用例有两个方向，不能只防一头</b>：转太多要拦，<b>因为误判而不转，同样是坏的</b>。</p>
+</div>
+</div>
+
+<div class="uc" id="u24">
+<h3>U24 · 它停下来的时候，我知道它停了</h3>
+
+<span class="seg">我要做的</span>
+<p>问一句「现在什么情况」。</p>
+
+<span class="seg">我应该体验到</span>
+<p><b>"还在做"和"卡住了"是两个不同的答案。</b> 不是同一片安静。</p>
+
+<span class="seg">不这么做会怎样</span>
+<blockquote class="neg">
+<p><b>第一种</b>：我派了一件活出去，然后就没有然后了。<b>我不知道它是在想、是死了、还是干完了忘了说。</b> 我唯一能做的是等够久，再去戳一下。</p>
+<p><b>第二种，是"简单地加个超时"换来的</b>：我给它设了「十五分钟没动静就重派」。然后我派了一件需要长时间思考的活——<b>它没死，只是在想</b>，而且想的时候不调用任何工具，所以外面看不到任何动静。</p>
+<p>系统把它收回、重派；新的那个还是想那么久，又被收回。<b>我看到的是这件活永远做不完，日志里全是「重派、重派、重派」，看不出为什么。</b></p>
+</blockquote>
+
+<div class="why">
+<span class="lab">为什么这条重要</span>
+<p><b>这件事 2026-08-17 那天发生了十一次。</b> 派出去的执行者报了「我空闲了」，<b>一份结果都没交</b>。只能一个个去催，催了才拿到东西。</p>
+<p><b>从外面看，"干完了没说"和"卡死了"长得一模一样。</b></p>
+<p><b>旧系统里也是同一个形状</b>：负责回复的那个副本经常做完回复、忘了记账，于是<b>对我来说这轮交互发生了，对系统来说它从没发生过</b>。同样是安静，含义完全相反。</p>
+<p><b>环闭上之后这件事会变得更贵</b>：现在是我在等，我知道我在等；<b>以后是没人在等</b>——它卡住了，可能几天都没人发现。</p>
+</div>
+</div>
+
+<h3>两件没写成用例的事</h3>
+
+<p><b>一 · "我能随时叫停"。</b> 这件事显然要有，但说不出它在这个项目里真出过什么事——<b>因为环还没闭上，还没有过需要叫停的东西</b>。等真需要了再写，现在写就是想象。</p>
+
+<p><b>二 · "它该主动告诉我什么"。</b> 这一条暂时定不下来。太多就成了噪音（<a href="#u9">U9</a> 那条"98.5% 是噪音的记录和没有记录差不多"说的就是它），太少就是 <a href="#u24">U24</a> 那种安静。<b>这条要等环真转起来、我被烦过或被漏过一次，才知道线画在哪儿。</b></p>
+
+<p><b>先不猜。</b></p>
+
+<h2 id="table">七、24 条总览与验收现状</h2>
+
+<p>最后一列分两栏，因为<b>"规格里写了"和"测试里实现了"是两个数</b>。把它们并成一个"有"，会让一条只写在纸上的断言看起来像已经在守着。</p>
+
+<div class="stkey" style="margin-bottom:14px">
+  <span><b>规格断言</b> = <code>docs/acceptance/*.md</code> 里那张表的行数</span>
+  <span><b>测试实现</b> = <code>test/acceptance/*.test.ts</code> 里带编号的 <code>test()</code> 数</span>
+</div>
+
+<div class="scroll-x">
+<table class="sum">
+<tr><th>编号</th><th>一句话标题</th><th>组</th><th>规格<br>断言</th><th>测试<br>实现</th></tr>
+<tr><td><a href="#u1"><b>U1</b></a></td><td>我要把系统跑起来</td><td>启停</td><td>5 条</td><td>5 条</td></tr>
+<tr><td><a href="#u2"><b>U2</b></a></td><td>我要把系统停干净</td><td>启停</td><td>4 条</td><td>4 条</td></tr>
+<tr><td><a href="#u3"><b>U3</b></a></td><td>我要知道现在什么在跑</td><td>启停</td><td>4 条</td><td>4 条</td></tr>
+<tr><td><a href="#u4"><b>U4</b></a></td><td>我要加一个新部件</td><td>启停</td><td>4 条</td><td>4 条</td></tr>
+<tr><td><a href="#u5"><b>U5</b></a></td><td>我要把 Theseus 搬到另一台机器</td><td>启停</td><td>3 条</td><td>3 条</td></tr>
+<tr><td><a href="#u6"><b>U6</b></a></td><td>出问题时我要能查</td><td>启停</td><td>5 条</td><td>5 条</td></tr>
+<tr><td><a href="#u7"><b>U7</b></a></td><td>查"刚才那件事为什么发生"</td><td>痕迹</td><td>6 条</td><td>8 条 <sup>※1</sup></td></tr>
+<tr><td><a href="#u8"><b>U8</b></a></td><td>查"这件事为什么没发生"</td><td>痕迹</td><td>12 条</td><td>4 条</td></tr>
+<tr><td><a href="#u9"><b>U9</b></a></td><td>一眼看见有意义的事，不被心跳淹掉</td><td>痕迹</td><td>3 条</td><td>3 条</td></tr>
+<tr><td><a href="#u10"><b>U10</b></a></td><td>系统自己也读这份痕迹</td><td>痕迹</td><td>4 条</td><td>2 条</td></tr>
+<tr><td><a href="#u11"><b>U11</b></a></td><td>我要它一年后还能用</td><td>痕迹</td><td>4 条</td><td>2 条</td></tr>
+<tr><td><a href="#u12"><b>U12</b></a></td><td>我不需要谁「记得」去留痕</td><td>痕迹</td><td>4 条</td><td>1 条</td></tr>
+<tr><td><a href="#u13"><b>U13</b></a></td><td>旧的记忆整个接进来</td><td>痕迹</td><td>3 条</td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u14"><b>U14</b></a></td><td>换个 agent、换个会话，它还记得</td><td>痕迹</td><td>5 条</td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u15"><b>U15</b></a></td><td>随时知道自己在追什么、它从哪来</td><td>意图树</td><td>6 条</td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u16"><b>U16</b></a></td><td>散出去的分支不会丢，捡得回来</td><td>意图树</td><td>6 条</td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u17"><b>U17</b></a></td><td>跳走了，我能回来</td><td>意图树</td><td>4 条</td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u18"><b>U18</b></a></td><td>两件事原来是一件，能把它们并起来</td><td>意图树</td><td>5 条</td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u19"><b>U19</b></a></td><td>它越来越懂我，纠正它不白费</td><td>意图树</td><td>9 条</td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u20"><b>U20</b></a></td><td>事情发生了，该动的自己会动</td><td>环</td><td><b>0 条</b> <sup>※2</sup></td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u21"><b>U21</b></a></td><td>撤不回来的事，先问我一声</td><td>环</td><td><b>0 条</b> <sup>※2</sup></td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u22"><b>U22</b></a></td><td>那道关卡，自己也得受检验</td><td>环</td><td><b>0 条</b> <sup>※2</sup></td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u23"><b>U23</b></a></td><td>它不许把自己转起来</td><td>环</td><td><b>0 条</b> <sup>※2</sup></td><td><b>0 条</b></td></tr>
+<tr><td><a href="#u24"><b>U24</b></a></td><td>它停下来的时候，我知道它停了</td><td>环</td><td><b>0 条</b> <sup>※2</sup></td><td><b>0 条</b></td></tr>
+<tr><th>合计</th><th>24 条用例</th><th>四组</th><th>96 条<br><span style="font-weight:400">覆盖 19 条用例</span></th><th>45 条<br><span style="font-weight:400">覆盖 12 条用例</span></th></tr>
+</table>
+</div>
+
+<div class="why" style="border-top:none;padding-top:0">
+<p><b>※1 U7 的测试数比规格数多，不是覆盖得更好，是编号对不上。</b> 规格里是 <code>U7-1 / 2a / 2b / 3a / 3b / 4</code>，测试里是 <code>U7-1 / 2 / 2b / 3 / 4 / 4b / 4c / 5</code>——测试多出 <code>U7-4b</code>、<code>U7-4c</code>、<code>U7-5</code> 三条规格里没有的，规格里的 <code>U7-2a</code>、<code>U7-3a</code>、<code>U7-3b</code> 在测试里则用了别的名字。</p>
+<p><b>※2 环这一组既没有设计也没有验收。</b> 探针：<code>find docs -name '*loop*'</code> 全仓只命中 <code>docs/requirements/loop.md</code> 一个文件，<code>docs/design/loop.md</code> 和 <code>docs/acceptance/loop.md</code> 都不存在；<code>grep -rE 'U2[0-4]' docs test</code> 在验收与测试里<b>零命中</b>（唯一的两处出现，一处是 <code>loop.md</code> 自己，一处是 <code>lifecycle.test.ts</code> 扫全部文档找"顺序要求"时把 U21 的标题当语料，不是断言）。</p>
+<p><b>另有 4 条测试不带用例编号</b>，守的是"痕迹不能丢、不能重"那条前提——不重（两条）、不成环、号严格递增。它们没有对应的用例，因为那件事按规矩不占用例的位置。</p>
+</div>
+
+<footer>需求 · 2026-08-17 · 源：<code>docs/requirements/{lifecycle,trace,intent,loop}.md</code>（U1–U6 / U7–U14 / U15–U19 / U20–U24）· 验收现状取自 <code>docs/acceptance/*.md</code> 与 <code>test/acceptance/*.test.ts</code> 实测计数 · 用例正文一字未改，本文只做分组、配图与汇总 · 自包含离线可开</footer>
+
+</div>
+
+<script>
+(function(){
+  var hoverCapable = !!(window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches);
+  var stack=[], btn=document.getElementById('backjump');
+  function refreshBtn(){ if(btn) btn.hidden = stack.length===0; }
+  function closeTips(except){
+    var open=document.querySelectorAll('.gloss.open');
+    for(var i=0;i<open.length;i++){ if(open[i]!==except) open[i].classList.remove('open'); }
+    document.body.classList.toggle('tip-open', !!document.querySelector('.gloss.open'));
+  }
+  document.addEventListener('click',function(e){
+    var trg = e.target.closest ? e.target.closest('.gloss') : null;
+    if(trg){
+      if(hoverCapable) return;
+      var willOpen = !trg.classList.contains('open');
+      closeTips(trg);
+      trg.classList.toggle('open', willOpen);
+      document.body.classList.toggle('tip-open', willOpen);
+      return;
+    }
+    var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if(a){
+      var id=decodeURIComponent(a.getAttribute('href').slice(1));
+      if(id && document.getElementById(id)){ stack.push(window.scrollY); refreshBtn(); closeTips(null); return; }
+    }
+    closeTips(null);
+  });
+  if(btn) btn.addEventListener('click',function(){
+    if(!stack.length) return;
+    var y=stack.pop();
+    window.scrollTo({top:y,behavior:'smooth'});
+    refreshBtn();
+  });
+})();
+</script>
+</body>
+</html>

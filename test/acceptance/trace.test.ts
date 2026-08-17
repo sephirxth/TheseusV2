@@ -165,6 +165,28 @@ test('U7-4c: 不许编 —— 链子长过上限时，明说是走不到底，�
   assert.ok(chain.steps.length > 1 && chain.steps.length <= 66, `步数 ${chain.steps.length} 不像有上限`);
 });
 
+test('U7-5: 一条说不清是谁干的痕迹，根本进不来 —— 因为「我说的一句话」得分得出来', () => {
+  const t = mk();
+  // U7 承诺链子能查到「我说的一句话」。要兑现这句，就得分得清哪条是我说的。
+  // 分辨靠的是「谁干的」这一栏的中间那段（user:human:cli 的 human）。
+  // 所以这一栏说不清，U7 那个承诺就是空的。
+  const 说不清 = ['human', 'user:human', 'user:human:cli:extra', 'user::cli', ':human:cli', 'user:human:'];
+  for (const bad of 说不清) {
+    assert.throws(
+      () => t.record({ actor: bad, type: 'user.message_received', origin: 'you-said', payload: {} }),
+      /谁干的/,
+      `'${bad}' 这种写法被放进来了 —— 那之后就没办法回答「这条是不是我说的」`,
+    );
+  }
+  // 而且拒完什么都没留下：不许出现一条「进来了一半」的痕迹
+  assert.equal(t.recent({ includeRoutine: true }).length, 0,
+    '被拒之后痕迹里还是多了东西 —— 拒绝必须是「当没发生」');
+
+  // 正常的三段照常进得来，别把门修成谁都进不去
+  const ok = said(t, '这句必须能进来');
+  assert.equal(t.get(ok.id)?.actor, 'user:human:cli');
+});
+
 // ────────────────────── U8 · 我要能查「这件事为什么没发生」 ──────────────────────
 
 const DECISIONS = ['decision.declined', 'decision.deferred', 'decision.merged', 'decision.dropped'];
@@ -277,31 +299,81 @@ test('U9-2: 我要全部时，能拿到全部', () => {
   assert.ok(all.some((s) => s.type === 'time.tick'), '明说要看心跳，心跳没出现');
 });
 
+/**
+ * 这条量的是"例行公事占多少"，**不是把旧账本当正典导进来**（那是 U13）。所以这里不要求
+ * 旧数据条条都能进新门：**进不来的，当场数出来、按哪道门分好类、连同类型一起摆出来。**
+ *
+ * 为什么不放宽那道门：门是对的——决定不带依据，事后就查不出它当时凭什么这么定
+ * （U8-2 押着这条）。放宽等于让新系统继承旧系统的毛病。而拒了多少条本身是 U13 要的数字，
+ * **吞掉它，"接进来的这批有限制"就永远只是一句话。**
+ *
+ * 2026-08-17 实测的三道门（旧账本 8 月那批，22993 条）：
+ *   决定/自我总结没带依据    1 条（`decision.recorded`，今天刚由一个 agent 写下的头一条）
+ *   既没有上一步也没说起点   13382 条 —— 这一遍不响：起点由这条测试自己填
+ *   谁干的不是三段          17289 条 —— 这一遍不响：谁干的由这条测试自己填
+ * 后两个数是**照原样搬**才会撞上的，属于 U13 那一轮的账，记在这儿免得下次重新量一遍。
+ * 整本旧账（2026-03..08，149784 条）同口径：没有上一步 107553 条 = 71.8%，
+ * 谁干的不是三段 120435 条 = 80.4%（绝大多数是 `system:tick-injector` 这样的两段），
+ * 决定/自我总结没带依据 **整本只有 1 条**。前两道门搬的时候能机械补齐（补一段、按类型定起点），
+ * **只有"依据"那道补不了**——依据是当时凭什么，事后编不出来。
+ */
 test('U9-3: 拿真实旧数据量一遍 —— 把旧账本 8 月那批喂进去，默认视图必须只剩一小撮', () => {
   assert.ok(existsSync(OLD_LEDGER), `旧账本不在 ${OLD_LEDGER} —— 这条量不出来就是量不出来，不算绿`);
   const files = readdirSync(OLD_LEDGER).filter((f) => f.startsWith('2026-08-') && f.endsWith('.jsonl'));
   assert.ok(files.length > 0, `${OLD_LEDGER} 里没有 8 月的账本`);
 
+  /** 哪道门拦下的。**认不出来的拒绝要单独现形**：那是门坏了，不是数据旧了。 */
+  const GROUNDS = '决定/自我总结没带依据';
+  const gateOf = (msg: string): string =>
+    /没有依据|依据全是例行公事/.test(msg) ? GROUNDS
+      : /既没有上一步/.test(msg) ? '既没有上一步也没说自己是哪种起点'
+        : /谁干的/.test(msg) ? '谁干的不是三段'
+          : `叫不出名字的拒绝：${msg}`;
+
   const t = mk();
-  let fed = 0;
+  let read = 0;
+  let kept = 0;
+  const refused = new Map<string, number>();
   for (const f of files.sort()) {
     for (const line of readFileSync(`${OLD_LEDGER}/${f}`, 'utf8').split('\n')) {
       if (!line.trim()) continue;
       const e = JSON.parse(line) as { type?: string };
       if (typeof e.type !== 'string') continue;
-      // 喂进来的是外面的东西：只带类型，旧的因果不跟着搬（那是 U13 的事）。
-      t.record({ actor: 'ledger:august:replay', type: e.type, origin: 'arrived-from-outside' });
-      fed++;
+      read++;
+      try {
+        // 喂进来的是外面的东西：只带类型，旧的因果不跟着搬（那是 U13 的事）。
+        t.record({ actor: 'ledger:august:replay', type: e.type, origin: 'arrived-from-outside' });
+        kept++;
+      } catch (err) {
+        if (!(err instanceof TraceRefused)) throw err;
+        const key = `${gateOf(err.message)} · ${e.type}`;
+        refused.set(key, (refused.get(key) ?? 0) + 1);
+      }
     }
   }
+
   const all = t.recent({ limit: 200_000, includeRoutine: true }).length;
   const notable = t.recent({ limit: 200_000 }).length;
   const pct = (notable / all) * 100;
-  console.log(`  U9-3: 喂进 ${fed} 条，默认视图 ${notable} 条 = ${pct.toFixed(2)}%（例行 ${all - notable} 条）`);
-  assert.equal(all, fed, '喂进去的和记下来的对不上');
+  const turnedAway = [...refused.values()].reduce((n, x) => n + x, 0);
+  console.log(`  U9-3: 读到 ${read} 条，收下 ${kept} 条，门外拦下 ${turnedAway} 条`
+    + `（${((turnedAway / read) * 100).toFixed(3)}%）`);
+  for (const [k, n] of [...refused].sort()) console.log(`        拦下：${k} × ${n}`);
+  console.log(`  U9-3: 默认视图 ${notable} 条 = ${pct.toFixed(2)}%（例行 ${all - notable} 条）`);
+
+  assert.equal(all, kept, '收下的和记下来的对不上');
   assert.ok(notable > 0, '默认视图一条都不剩 —— 那是把有意义的也一起埋了');
   assert.ok(pct <= 5,
     `默认视图还占 ${pct.toFixed(2)}% —— 规格说该落在个位数百分比；还剩这么多，是规则定错了，不是数据的问题`);
+
+  // 这一遍"谁干的"和"起点"两栏是这条测试自己填的（三段 + arrived-from-outside），
+  // 所以只有"决定必须带依据"那道门够得着。别的门响了，说明喂法和以为的不一样，或者门坏了。
+  const unexpected = [...refused.keys()].filter((k) => !k.startsWith(GROUNDS));
+  assert.deepEqual(unexpected, [],
+    '出现了这一遍本不该响的拒绝 —— 要么喂进去的形状和以为的不一样，要么门自己坏了');
+  assert.ok(turnedAway <= read * 0.01,
+    `旧账本里过不了新门的有 ${turnedAway} / ${read} 条 = ${((turnedAway / read) * 100).toFixed(2)}%`
+    + ` —— 过了 1% 就不是"个别旧记录"了，得当成一次真的迁移来办（U13），不该在这条用例里顺手带过`);
 });
 
 // ────────────────────────── U10 · 系统自己也读这份痕迹 ──────────────────────────

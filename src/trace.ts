@@ -102,7 +102,12 @@ CREATE TABLE IF NOT EXISTS trace (
   payload  TEXT NOT NULL,
   idem     TEXT UNIQUE,
 
-  CHECK (cause IS NULL OR cause < id)
+  CHECK (cause IS NULL OR cause < id),
+
+  -- 三段，且每段非空。上面 record() 里那道门是给人看的错误信息，
+  -- 这一条是给"绕过门直接写库的人"准备的：门是约定，约束是结构。
+  -- '_%' 要求每段至少一个字符；后半句挡掉四段及以上。
+  CHECK (actor LIKE '_%:_%:_%' AND actor NOT LIKE '%:%:%:%')
 );
 CREATE INDEX IF NOT EXISTS trace_cause  ON trace(cause);
 CREATE INDEX IF NOT EXISTS trace_ts     ON trace(ts);
@@ -200,6 +205,20 @@ export class Trace {
    * 上一步不存在的，链子从出生就断了；决定不带依据的，查出来只有"它没做"。
    */
   record(m: Mark): Step {
+    // 谁干的，必须分三段：地盘:身份:这一次。
+    // 中间那段是"人还是 agent"的唯一依据——意图树整条判据压在它上面
+    // （"上一步那条的中间段是 human 才算我的意图"）。它要是个自由字符串，
+    // 那条判据就是在猜。
+    //
+    // 卡在这里而不是只写进文档，是因为这张表只追加：等有了真数据再加约束，
+    // 就得重建这张表，而"痕迹不改写"是这套东西的立身之本。
+    const seg = m.actor.split(':');
+    if (seg.length !== 3 || seg.some((s) => s === '')) {
+      throw new TraceRefused(`'${m.type}': 谁干的写成了 '${m.actor}' ——`
+        + ` 必须是三段 地盘:身份:这一次（如 user:human:cli / agent:codex:sess-a1），`
+        + ` 三段都不能空。中间那段决定这条痕迹算不算人说的。`);
+    }
+
     const hasCause = m.cause !== undefined;
     const hasOrigin = m.origin !== undefined;
     if (hasCause && hasOrigin) {
