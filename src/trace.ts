@@ -307,6 +307,32 @@ export class Trace {
     return (this.#db.prepare(FORWARD).all(id, id) as unknown as Row[]).map(toStep);
   }
 
+  /**
+   * 某一类痕迹，从头到尾按发生顺序。意图树的折叠从这儿读（design/intent.md 1.2）：
+   * 折叠没有自己的存储，它每次都从这里重新长出来。
+   * 前缀按字面比对，不是模式——`_` 在这儿就是下划线。
+   */
+  ofType(prefix: string): readonly Step[] {
+    const rows = this.#q(
+      `SELECT ${COLS} FROM trace WHERE substr(type, 1, length(?)) = ? ORDER BY id`,
+    ).all(prefix, prefix) as unknown as Row[];
+    return rows.map(toStep);
+  }
+
+  /**
+   * 这条之后，人有没有再开口。"没接"的边界压在它上面（design/intent.md 3.2）：
+   * 用对话自己的节拍当边界，不用墙上的钟——计时器会因为我今天忙就冤枉 agent 一次，
+   * 而一条会冤枉人的检验，和一条不会说"不"的检验一样坏。
+   *
+   * `'%:human:%'` 比对的就是中间那段：actor 被门卡死为恰好三段（两个冒号），
+   * 所以两边都有冒号的 human 只可能落在中间。
+   */
+  humanSpokeAfter(id: string): boolean {
+    return this.#q(
+      `SELECT 1 FROM trace WHERE id > ? AND actor LIKE '%:human:%' LIMIT 1`,
+    ).get(id) !== undefined;
+  }
+
   /** U9：看看最近都发生了什么。**默认不给例行公事**，要全部就明说。 */
   recent(o: { limit?: number; includeRoutine?: boolean } = {}): readonly Step[] {
     const rows = this.#db.prepare(

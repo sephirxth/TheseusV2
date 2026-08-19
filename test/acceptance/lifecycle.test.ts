@@ -381,6 +381,10 @@ const JUDGED: readonly (readonly [string, Verdict])[] = [
   // docs/TODO.md —— 不是这个项目的文件（root 写入、未被 git 跟踪），见报告。
   // "先验" 是先验概率的先验，不是"先做这个"：扫描器的 COMPOUNDS 没收这个词，是一次词法误伤。
   ['支持 M1 装配（注入 Captain 先验与 L3 当前任务上下文）', 'spec'],
+
+  // README.md 进仓后补判（2026-08-19）。两句都在架构图（mermaid）的边标签里。
+  ['没人需要记得留痕', 'negation'],
+  ['该动的自己动，撤不回的先问', 'mechanism'],
 ];
 
 test('U2-4: 我没有被要求按任何顺序做事 —— 扫全部文档，没有一句"先…再…"是写给操作者的', () => {

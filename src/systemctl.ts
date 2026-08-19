@@ -6,7 +6,9 @@ export class SystemdUnavailable extends Error {
   override readonly name = 'SystemdUnavailable';
 }
 
-const UNREACHABLE = /Failed to connect to (the )?bus|Refusing to operate|D-?Bus connection|No such file or directory.*bus/i;
+// systemd 说这句话的方式随版本变：老的说 "connect to bus"，257 起（EC2 实测）说
+// "connect to user scope bus via local transport"。两种都得认出来，认不出就退化成 E7 要防的那种普通报错。
+const UNREACHABLE = /Failed to connect to (the )?(user scope )?bus|Refusing to operate|D-?Bus connection|No such file or directory.*bus/i;
 
 /** Every systemctl call in the codebase goes through here, so E7 has one place to live. */
 export const audit = (line: string): void => {
