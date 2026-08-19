@@ -65,6 +65,7 @@ flowchart LR
 | **Trace** | Causal chains, three origins, decisions with grounds | U7–U14 | ✅ Implemented + accepted (migration round U13/U14 pending) |
 | **Intent tree** | What I'm pursuing and where it came from, folded from the trace | U15–U19 | ✅ Implemented + accepted |
 | **Loop** | Event → something notices → action → new trace | U20–U24 | 📋 Requirements written (with failure scenarios) |
+| **Bridge** | The live connection: my words reach the trace wherever I talk; briefings open every session; switching intents actually takes effect | U25–U29 | 📋 Requirements written (with failure scenarios) |
 
 Each module moves through the same pipeline: requirements (no technical vocabulary allowed) → design (citing the prior art each choice borrows from) → acceptance spec (asserting the user's situation, not the mechanism's state) → implementation → mutation lock.
 
@@ -153,7 +154,9 @@ The self-built pieces are individually flagged (★) in the design docs and watc
 
 ## Roadmap
 
+- **Bridge (U25–U29)** — design and implementation: wire the system to where conversations actually happen — capture through the human door, opening briefings, intent switching that takes effect across concurrent sessions, gap-tolerant reconnection.
 - **Loop (U20–U24)** — design and implementation: closing event → notice → act → trace, with an ask-me gate on irreversible actions and self-feeding protection.
+- **Intent canvas** — the tree spread out on an infinite, draggable surface; a second entry point, spec'd after the bridge lands.
 - **Ledger migration (U13)** — importing the old system's 149k-record ledger through the new gates.
 - **Cross-agent trace (U14)** — several agents writing one trace.
 - **Hermes Memory Provider bridge** — exposing the layered memory over a standard interface (`docs/TODO.md`).
