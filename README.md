@@ -1,131 +1,167 @@
 <p align="center">
-  <img src="docs/assets/banner.png" alt="忒修斯之船：在航行中换板，船迹升成一棵星座因果树" width="100%">
+  <img src="docs/assets/banner.png" alt="The ship of Theseus, rebuilt plank by plank while sailing; its wake rises into a constellation tree" width="100%">
 </p>
 
-# Theseus V2
+<h1 align="center">Theseus V2</h1>
 
-**一个人的 AI 操作系统，自顶向下重建。**
+<p align="center">
+  A personal AI operating system, rebuilt top-down: declarative process lifecycle, an append-only causal trace, and an intent tree derived from what actually happened.
+</p>
 
-像忒修斯之船：板子在航行中一块块换掉，而船必须始终是那条船——系统在运行中被替换、被修正、被长出新的部分，而"我在追什么、发生过什么、为什么"这三个问题在任何时刻都答得上来。
+<p align="center">
+  <a href="LICENSE"><img alt="License: PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue"></a>
+  <img alt="Node >= 22.18" src="https://img.shields.io/badge/node-%3E%3D%2022.18-brightgreen">
+  <img alt="Runtime dependencies: 0" src="https://img.shields.io/badge/runtime%20deps-0-orange">
+  <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178c6">
+</p>
 
-> 全部文档以中文写成，这是这个项目的工作语言。
-> Documentation is in Chinese — the working language of this project.
+<p align="center">
+  English | <a href="README.zh-CN.md">中文</a>
+</p>
 
 ---
 
-## 这是什么
+Like the ship of Theseus, this system is designed to be rebuilt plank by plank while it sails: parts get replaced, corrected, and grown at runtime, while three questions stay answerable at any moment — **what am I pursuing, what happened, and why**.
 
-一个个人 AI OS 的地基，由四块构成，每块对应一段编号连续的用户用例（U1–U24）：
+> **Note:** the requirements, design, and acceptance documents under `docs/` are written in Chinese, the working language of this project. This README is the English entry point.
 
-| 模块 | 管什么 | 用例 | 状态 |
-|---|---|---|---|
-| **启停** (lifecycle) | 部件进程的生死：声明式启停、诚实的状态、双向对账 | U1–U6 | ✅ 实现 + 验收 |
-| **痕迹** (trace) | 留下的那份东西：因果链、三种起点、决定必须带依据 | U7–U14 | ✅ 实现 + 验收（U13/U14 迁移轮除外） |
-| **意图树** (intent) | 我在追什么、它从哪来：树是从痕迹里折叠出来的，不另存 | U15–U19 | ✅ 实现 + 验收 |
-| **环** (loop) | 事情发生 → 有东西看见 → 动手 → 又留痕：把三块连起来 | U20–U24 | 📋 需求已定（含反面场景） |
+## Features
 
-每一块都是同一条流水线：**需求**（`docs/requirements/`，一个技术名词都不出现）→ **设计**（`docs/design/`，每处写明用的是谁的成熟做法）→ **验收**（`docs/acceptance/`，断言"人的处境"而不是"机制的状态"）→ 实现 → **变异锁**（`test/mutation-lock.mjs`，故意弄坏每条关键性质，确认对应测试真的会红）。
+- **Declarative lifecycle on systemd** — `parts.ts` is the single source of truth. Unit files are derived from it byte-for-byte; `up` / `down` / `status` are idempotent; drift is reported in both directions (installed but undeclared, declared but missing). Dependency cycles and dangling references are rejected with the full chain named.
+- **Honest state reporting** — each of systemd's six `ActiveState` values has an explicit translation (`activating` is *starting*, never *running*). Unrecognized states surface with the raw word instead of falling into a default, and "unit not installed" is its own state rather than *stopped*.
+- **Append-only causal trace on SQLite** — every step records who did it (`namespace:type:session`), what caused it, or which of three recognized origins it came from (`you-said` / `clock-fired` / `arrived-from-outside`). IDs are monotonic ULIDs, so a single `CHECK (cause < id)` makes causal cycles structurally impossible.
+- **Decisions carry their grounds** — `decision.*` and `self.*` records are refused without a `basis`; conclusions resting entirely on routine bookkeeping are refused as well.
+- **Compaction that downsamples, never deletes** — old routine records fold into daily counts; anything referenced by a cause or basis stays put, and causal chains replay intact afterwards.
+- **An intent tree that is a query, not a table** — the tree is folded out of the trace on every read; there is no second store to drift. Only intents backed by a direct human utterance become nodes; agent proposals never do. Corrections replace a node's current wording while the original stays in place, retrievable later as (guess, fix) pairs.
+- **Two doors** — human-facing entry points may write human-attributed records; the agent-facing door refuses them outright, so the authority criterion cannot be forged from the reachable surface.
+- **Mutation-locked test suite** — a harness deliberately breaks each load-bearing property and verifies its test goes red. A test that stays green under mutation is reported as decoration.
+- **Zero runtime dependencies** — Node's built-in `node:sqlite`, systemd, and TypeScript executed directly by Node. The only packages are `typescript` and `@types/node`, both dev-only.
 
-## 第一原则：先找成熟解法，再考虑自己造
-
-这个系统应该**只有极少部分值得创新**（[`docs/PRINCIPLES.md`](docs/PRINCIPLES.md)）。这条原则在项目里每次听它的都赢、不听的都栽：
-
-| 问题 | 一开始想自己造 | 换成谁的做法 | 结果 |
-|---|---|---|---|
-| 进程的生死 | 564 行看护程序 | **systemd** | 代码 564 → 298 行，第 1 版里最难的六条需求**不是被解决的，是消失了** |
-| 并发命令 | 内存里的版本号护栏 | **文件锁**（`O_EXCL` + tmpfs，dpkg/git 的做法） | 跨进程真的有效，比原方案更强 |
-| 多余的东西谁来删 | 按名字前缀删 | **Terraform/K8s 的答案**：只删自己造的 | "连旧系统一起删掉"这个错**从根上不可能犯** |
-| 痕迹用什么存 | 自己定文件格式 | **SQLite** | 不丢（事务）、不重（唯一约束）、追因果（递归查询）、翻得动（索引） |
-
-自己造的部分被单独点名、单独盯着：声明是唯一入口、不撒谎的状态翻译、依赖预检、双向对账（地基四样）；出生边、融合边、"没接"的边界、三个记号字符串（意图树四样，见 [`docs/design/intent.md`](docs/design/intent.md) 第九节的落账表）。
-
-## 架构
+## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph 启停
-    D["parts.ts<br/>（声明，唯一入口）"] -->|theseus up 逐字节生成| U["systemd 用户单元"]
-    U --> P["部件进程"]
+  subgraph Lifecycle
+    D["parts.ts<br/>(the declaration)"] -->|"theseus up<br/>byte-for-byte"| U["systemd user units"]
+    U --> P["part processes"]
   end
-  subgraph 痕迹
-    P -->|"stdout（systemd append）"| L["日志文件"]
-    L -->|"absorb 旁路截获<br/>（没人需要记得留痕）"| T[("trace<br/>SQLite · 只追加")]
-    H["人说的话<br/>（人的门）"] --> T
-    A2["agent 干的事<br/>（agent 的门）"] --> T
+  subgraph Trace
+    P -->|"stdout (systemd append)"| L["log files"]
+    L -->|"absorb: intercepted<br/>from the side"| T[("trace<br/>SQLite, append-only")]
+    H["human utterances<br/>(human door)"] --> T
+    A2["agent actions<br/>(agent door)"] --> T
   end
-  subgraph 意图树
-    T -->|"折叠<br/>（只有'我认了'的长成节点）"| I["我在追什么<br/>它从哪来"]
+  subgraph Intent
+    T -->|"fold: only adopted<br/>intents become nodes"| I["what am I pursuing,<br/>and where it came from"]
   end
-  I -.->|"环（设计中）：<br/>该动的自己动，撤不回的先问"| A2
+  I -.->|"the loop (planned):<br/>act on what happened,<br/>ask about anything irreversible"| A2
 ```
 
-几条立住的性质，每条都有测试或约束押着：
+## Project status
 
-- **状态不撒谎**：systemd 的六种 `ActiveState` 逐个明写翻译（`starting` 不是 `running`——在动是证据，不是到了），认不出的带原文报出，装了没声明/声明了没装两个方向都点名。
-- **因果成环在结构上不可能**：痕迹 id 是 ULID（按时间排序），一句 `CHECK (cause < id)` 顶掉整套环检测——成环意味着某条记录比自己早。
-- **链子走到头必须落在三种起点之一**：你说的 / 时钟到点 / 外面来的。断了明说断了，走不完明说没走完，**不许编一条看起来连着的链子**。
-- **决定必须带依据**：`decision.*` / `self.*` 不带 basis 当场被拒；依据全是例行公事的结论也被拒（"我属于第几批导入"不是"这条结论从哪来"）。
-- **清理是降采样，不是删除**：只折叠没人指着的例行记录，折完 U7 的链子必须原样重跑通过。
-- **树不另存一份**：意图树是痕迹表上的一次折叠。父亲不是字段，是"出生那一刻我正在追的那条"算出来的——**树上写的和实际发生的是两回事**这种病，没有地方发。
+| Module | Scope | Use cases | Status |
+|---|---|---|---|
+| **Lifecycle** | Process start/stop, honest state, two-way drift reconciliation | U1–U6 | ✅ Implemented + accepted |
+| **Trace** | Causal chains, three origins, decisions with grounds | U7–U14 | ✅ Implemented + accepted (migration round U13/U14 pending) |
+| **Intent tree** | What I'm pursuing and where it came from, folded from the trace | U15–U19 | ✅ Implemented + accepted |
+| **Loop** | Event → something notices → action → new trace | U20–U24 | 📋 Requirements written (with failure scenarios) |
 
-## 上手
+Each module moves through the same pipeline: requirements (no technical vocabulary allowed) → design (citing the prior art each choice borrows from) → acceptance spec (asserting the user's situation, not the mechanism's state) → implementation → mutation lock.
 
-要求：Linux + systemd 用户实例，Node ≥ 22.18（直接跑 TypeScript + `node:sqlite`，零运行时依赖）。
+Current test tally: **121 tests passing, 41/41 mutations turn their target test red**.
+
+## Getting started
+
+### Prerequisites
+
+- Linux with a running systemd **user** instance
+- [Node.js](https://nodejs.org) ≥ 22.18 (runs TypeScript directly and ships `node:sqlite`)
+- [pnpm](https://pnpm.io)
+
+### Installation
 
 ```bash
-pnpm install          # 只有 typescript 和 @types/node，都是 dev 依赖
+git clone https://github.com/sephirxth/TheseusV2.git
+cd TheseusV2
+pnpm install
+```
 
-# 声明你的部件（parts.ts 是唯一入口，其余一切都是它的推导）
-# export const parts = [
-#   { name: 'bridge',  needs: [],         command: 'exec node bridge.js' },
-#   { name: 'watcher', needs: ['bridge'], command: 'exec node watcher.js',
-#     ready: 'curl -sf localhost:7700/health' },   # 可选：什么叫"能干活了"
-# ];
+### Usage
 
-node src/cli.ts up        # 到达声明的状态（幂等；失败不回滚，修好再 up）
-node src/cli.ts status    # 诚实的状态 + 双向漂移
-node src/cli.ts down      # 停下（以 systemd 持有的为准，不是磁盘上的）
+Declare your parts in `parts.ts` — everything else is derived from it:
+
+```ts
+export const parts: readonly Part[] = [
+  { name: 'bridge',  needs: [],         command: 'exec node bridge.js' },
+  { name: 'watcher', needs: ['bridge'], command: 'exec node watcher.js',
+    ready: 'curl -sf localhost:7700/health' },   // optional readiness probe
+];
 ```
 
 ```bash
-pnpm typecheck        # tsc --noEmit（strict 全开）
-pnpm test             # 单元 + 验收（验收只走用户看得见的那道门）
-pnpm mutate           # 变异锁：弄坏每条关键性质，确认有测试会红
+node src/cli.ts up        # reach the declared state (idempotent; no rollback — fix and rerun)
+node src/cli.ts status    # honest per-part state plus drift in both directions
+node src/cli.ts down      # stop (based on what systemd holds, not what is on disk)
 ```
 
-> 验收测试里有一条（U9-3）要拿旧系统的真实账本量一遍例行公事的占比，路径可用
-> `THESEUS_OLD_LEDGER` 环境变量指定；量不到就是量不到，那条不算绿。
+### Testing
 
-## 仓库结构
+```bash
+pnpm typecheck    # tsc --noEmit, strict everything
+pnpm test         # unit + acceptance (acceptance uses public entry points only)
+pnpm mutate       # mutation lock: break each property, expect its test to go red
+```
+
+One acceptance test (U9-3) measures the routine-record ratio against a real ledger from the previous system; point `THESEUS_OLD_LEDGER` at it, or that test reports itself unmeasurable rather than passing quietly.
+
+## Project structure
 
 ```
-parts.ts                  声明。这个文件是真相，其余都是推导
+parts.ts                  The declaration. This file is the truth; the rest is derived
 src/
-  theseus.ts              up / down / status，依赖预检，双向对账
-  unit.ts state.ts        Part → unit 文件的逐字节翻译；状态翻译表
-  systemctl.ts lock.ts    唯一的 systemctl 通道（E7 一处安家）；O_EXCL 文件锁
-  trace.ts routine.ts     痕迹：唯一的那道门 + 哪些类型算例行公事
-  doors.ts                人的门 / agent 的门：agent 写不出"人说的话"
-  intent.ts               意图树：折叠、判据、三个记号、悬着的名单
-  cli.ts                  同三个动词的第二个适配器，没有行为
+  theseus.ts              up / down / status, dependency precheck, two-way reconciliation
+  unit.ts, state.ts       Part → unit-file translation; the ActiveState translation table
+  systemctl.ts, lock.ts   The only systemctl channel; O_EXCL file lock
+  trace.ts, routine.ts    The trace: its single write gate + which types count as routine
+  doors.ts                Human door / agent door: agents cannot write human-attributed records
+  intent.ts               Intent tree: fold, authority criterion, markers, dangling list
+  cli.ts                  A second adapter over the same three verbs; no behavior lives here
 docs/
-  PRINCIPLES.md           第一原则与它赢过的四次
-  requirements/           人要什么（不出现技术名词）
-  design/                 用什么手段，抄的谁，自己造的单独标 ★
-  acceptance/             怎么知道真的兑现了（红比绿更重要）
-  TODO.md                 下一步
+  PRINCIPLES.md           The proven-solutions principle and the four times it won
+  requirements/           What a person needs (no technical vocabulary)
+  design/                 The means chosen, whose prior art each one borrows, ★ on inventions
+  acceptance/             How we know it is delivered (red matters more than green)
+  TODO.md                 Upcoming work
 test/
-  *.test.ts               单元测试
-  acceptance/*.test.ts    验收：断言照抄规格措辞
-  mutation-lock.mjs       测试的测试：不会红的测试是装饰品
+  *.test.ts               Unit tests
+  acceptance/*.test.ts    Acceptance: assertions phrased in the spec's own words
+  mutation-lock.mjs       Tests of the tests: a test that never goes red is decoration
 ```
 
-## 现在到哪儿了
+## Design philosophy
 
-- 启停、痕迹、意图树三块完工：验收全绿（121 条），变异锁全红（41 个变异个个让对应测试变红）。
-- 环：需求已定（U20–U24，每条带反面场景——照着别人翻过的车写的），**设计是下一步**。
-- 更远处：旧账本迁移（U13）、跨 agent（U14）、Hermes Memory Provider 桥接（`docs/TODO.md`）。
+Reach for a proven solution; invent only where this system is genuinely novel ([`docs/PRINCIPLES.md`](docs/PRINCIPLES.md)). Four times this principle replaced an invention with someone else's answer, and each swap made whole categories of requirements disappear:
 
----
+| Problem | The invented approach | The proven answer | Outcome |
+|---|---|---|---|
+| Process lifecycle | A 564-line supervisor | **systemd** | 298 lines; the six hardest requirements vanished instead of being solved |
+| Concurrent commands | An in-memory epoch guard | **File lock** (`O_EXCL` on tmpfs, as dpkg and git do) | Works across processes, strictly stronger |
+| Cleaning up strays | Delete by name prefix | **Terraform/Kubernetes answer**: delete only what carries our marker | "Deleting the old system too" became impossible by construction |
+| Trace storage | A homegrown file format | **SQLite** | Durability, dedup, recursive causal queries, and indexes all come built in |
 
-*痕迹与意图树的设计大量参考了 DeepSeek Harness 的 goal/authority 模型与 Agent Note 生命周期——每一处借用都在设计文档里写明了出处；自己造的每一处都标了 ★。*
+The self-built pieces are individually flagged (★) in the design docs and watched separately — they are the most expensive and error-prone parts of the system.
+
+## Roadmap
+
+- **Loop (U20–U24)** — design and implementation: closing event → notice → act → trace, with an ask-me gate on irreversible actions and self-feeding protection.
+- **Ledger migration (U13)** — importing the old system's 149k-record ledger through the new gates.
+- **Cross-agent trace (U14)** — several agents writing one trace.
+- **Hermes Memory Provider bridge** — exposing the layered memory over a standard interface (`docs/TODO.md`).
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE) — free for noncommercial use (personal projects, research, education, noncommercial organizations). **Commercial use requires a separate license**: contact sephirxth@gmail.com.
+
+## Acknowledgments
+
+The trace and intent-tree designs borrow heavily from DeepSeek Harness's goal/authority model and Agent Note lifecycle; every borrowed choice is credited in the design documents, and every invention is flagged with a ★.
