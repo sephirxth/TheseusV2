@@ -1,6 +1,7 @@
 import {
-  Background, Controls, MiniMap, Panel, ReactFlow, useNodesState, useReactFlow, useViewport,
-  MarkerType, type Edge, type NodeMouseHandler, type OnNodeDrag,
+  Background, ConnectionMode, Controls, MiniMap, Panel, ReactFlow,
+  useEdgesState, useNodesState, useReactFlow, useViewport,
+  MarkerType, type Connection, type Edge, type NodeMouseHandler, type OnNodeDrag,
 } from '@xyflow/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { act, fetchLayout, fetchProposals, fetchTree, onChange, saveLayout } from './api';
@@ -22,6 +23,11 @@ const clampScale = (v: number): number => Math.min(10, Math.max(0.35, v));
 
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 4;
+
+const fmtDate = (ms: number): string => {
+  const d = new Date(ms);
+  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
 
 /** 层级条：全景 + 四个常驻层（数字键 0–4 直达），顺带显示现在在第几层。 */
 const LAYERS: { key: string; label: string; zoom: number }[] = [
@@ -55,11 +61,16 @@ export default function App() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [layout, setLayout] = useState<Layout | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sayText, setSayText] = useState('');
   const [whyText, setWhyText] = useState('');
   const [err, setErr] = useState('');
+  /** 视图投影：自由布局（人摆的）/ 时间轴（横轴时间、纵轴意图线，算出来的）。 */
+  const [mode, setMode] = useState<'free' | 'timeline'>('free');
+  /** 两条真意图之间拖了线：问一句是"融合"还是"只是相关"。 */
+  const [pendingConnect, setPendingConnect] = useState<{ a: string; b: string } | null>(null);
+  const [mergeWhy, setMergeWhy] = useState('');
   /** 布局的唯一真身。state 只负责触发重画；存盘、视口、冲刷都走这个 ref。 */
   const layoutRef = useRef<Layout | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,6 +80,11 @@ export default function App() {
   const kindRef = useRef<Record<string, 'intent' | 'ghost' | 'note'>>({});
   const stageRef = useRef<HTMLDivElement | null>(null);
   const { screenToFlowPosition, getViewport, setViewport, setCenter, zoomTo, fitView } = useReactFlow();
+
+  // 给自动化验证留的小门把手（无头浏览器控制视口用），不参与任何业务。
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>)['__canvas'] = { setCenter, zoomTo, fitView, getViewport };
+  }, [setCenter, zoomTo, fitView, getViewport]);
 
   // 数字键直达层级：0 全景，1–4 对应层级条。
   useEffect(() => {
@@ -102,6 +118,7 @@ export default function App() {
         const [t, p, l] = await Promise.all([fetchTree(), fetchProposals(), fetchLayout()]);
         layoutRef.current = l;
         setTree(t); setProposals(p); setLayout(l);
+        if (l.mode !== undefined) setMode(l.mode);
       } catch (e) { oops(e); }
     })();
     return onChange(() => { void reload(); });
@@ -188,8 +205,39 @@ export default function App() {
   }, [mutateLayout]);
 
   const noteRemove = useCallback((id: string) => {
-    mutateLayout((l) => ({ ...l, notes: l.notes.filter((n) => n.id !== id) }));
+    mutateLayout((l) => ({
+      ...l,
+      notes: l.notes.filter((n) => n.id !== id),
+      links: (l.links ?? []).filter((k) => k.from !== id && k.to !== id),
+    }));
   }, [mutateLayout]);
+
+  /** 切换投影并记住：同一份真相，两种组织形式。 */
+  const switchMode = useCallback((m: 'free' | 'timeline') => {
+    setMode(m);
+    mutateLayout((l) => ({ ...l, mode: m }));
+    setTimeout(() => { void fitView({ padding: 0.15, duration: 350 }); }, 120);
+  }, [mutateLayout, fitView]);
+
+  /** 原生连线：人画的关联批注，存布局，可删。 */
+  const addLink = useCallback((from: string, to: string) => {
+    mutateLayout((l) => {
+      const links = l.links ?? [];
+      if (links.some((k) => (k.from === from && k.to === to) || (k.from === to && k.to === from))) return l;
+      return { ...l, links: [...links, { id: crypto.randomUUID(), from, to }] };
+    });
+  }, [mutateLayout]);
+
+  /** 拖线：两头都是真意图 → 问融合还是相关；沾着便签/幽灵 → 直接一条批注线。 */
+  const onConnect = useCallback((c: Connection) => {
+    if (c.source === null || c.target === null || c.source === c.target) return;
+    if (kindRef.current[c.source] === 'intent' && kindRef.current[c.target] === 'intent') {
+      setMergeWhy('');
+      setPendingConnect({ a: c.source, b: c.target });
+    } else {
+      addLink(c.source, c.target);
+    }
+  }, [addLink]);
 
   /** 幽灵实体化：认领=一句真话过人的门；有已认领的祖先就先"回到"它名下再认。 */
   const adoptGhost = useCallback(async (pid: string) => {
@@ -213,6 +261,12 @@ export default function App() {
       mutateLayout((l) => ({
         ...l,
         positions: { ...l.positions, [newId]: { x: pos.x, y: pos.y, ...(pos.s !== 1 ? { s: pos.s } : {}) } },
+        // 幽灵身上的批注线跟着实体化后的节点走，不断线。
+        links: (l.links ?? []).map((k) => ({
+          ...k,
+          from: k.from === pid ? newId : k.from,
+          to: k.to === pid ? newId : k.to,
+        })),
       }));
       await reload();
     } catch (e) { oops(e); }
@@ -232,11 +286,51 @@ export default function App() {
       })),
     ];
     const auto = autoPlace(union, layout.positions);
+
+    // 时间轴投影：横轴 = 时序（全体按时间排位），纵轴 = 意图线（每个根一条泳道，便签一条底道）。
+    // 投影是算出来的视图，不动自由布局里人摆的位置。
+    const unionById = new Map(union.map((u) => [u.id, u]));
+    const timeOf = (id: string): number => {
+      const k0 = tree.nodes.find((n) => n.id === id);
+      if (k0 !== undefined) return Date.parse(k0.bornOf?.ts ?? k0.lastTouched);
+      const g = proposals.find((p) => p.id === id);
+      if (g !== undefined) return Date.parse(g.ts);
+      const nt = layout.notes.find((n) => n.id === id);
+      return nt?.t ?? Date.now();
+    };
+    const laneRootOf = (id: string): string => {
+      let cur = id;
+      for (let i = 0; i < 64; i++) {
+        const p = unionById.get(cur)?.parent;
+        if (p === undefined || p === null || !unionById.has(p)) break;
+        cur = p;
+      }
+      return cur;
+    };
+    const timeline: Record<string, { x: number; y: number }> = {};
+    if (mode === 'timeline') {
+      const allIds = [...union.map((u) => u.id), ...layout.notes.map((n) => n.id)];
+      const ordered = [...allIds].sort((a, b) => timeOf(a) - timeOf(b));
+      const rank = new Map(ordered.map((id, i) => [id, i]));
+      const roots = [...new Set(union.map((u) => laneRootOf(u.id)))]
+        .sort((a, b) => timeOf(a) - timeOf(b));
+      const laneOf = new Map(roots.map((r, i) => [r, i]));
+      const noteLane = roots.length;                     // 便签一条底道
+      for (const id of allIds) {
+        const lane = unionById.has(id) ? (laneOf.get(laneRootOf(id)) ?? noteLane) : noteLane;
+        timeline[id] = { x: 80 + (rank.get(id) ?? 0) * 280, y: 80 + lane * 170 };
+      }
+    }
+
     const at = (id: string): { x: number; y: number; s: number } => {
       const stored = layout.positions[id];
-      const base = stored ?? auto[id] ?? { x: 0, y: 0 };
+      const proj = timeline[id];
+      const base = proj ?? stored ?? auto[id] ?? { x: 0, y: 0 };
       return { x: base.x, y: base.y, s: stored?.s ?? 1 };
     };
+    const dateOf = mode === 'timeline'
+      ? (id: string): string => fmtDate(timeOf(id))
+      : (): undefined => undefined;
     const pmap: Record<string, { x: number; y: number; s: number }> = {};
     const kmap: Record<string, 'intent' | 'ghost' | 'note'> = {};
     for (const u of union) pmap[u.id] = at(u.id);
@@ -251,29 +345,42 @@ export default function App() {
 
     const intentNodes: CanvasNode[] = tree.nodes.map((n) => {
       const p = at(n.id);
+      const date = dateOf(n.id);
       return {
         id: n.id, type: 'intent' as const, position: { x: p.x, y: p.y },
         data: {
           saying: n.saying, status: n.status, isCurrent: tree.current === n.id,
           mergedCount: n.mergedWith.length, bornText: n.bornOf?.text ?? '', s: p.s,
+          ...(date !== undefined ? { date } : {}),
           onScale: scaleNode,
         },
       };
     });
     const ghostNodes: CanvasNode[] = proposals.map((g) => {
       const p = at(g.id);
+      const date = dateOf(g.id);
       return {
         id: g.id, type: 'ghost' as const, position: { x: p.x, y: p.y },
         data: {
           text: cleanText(g.text), suspended: isSuspended(g.text), s: p.s,
+          ...(date !== undefined ? { date } : {}),
           onAdopt: adoptGhost, onScale: scaleNode,
         },
       };
     });
-    const noteNodes: CanvasNode[] = layout.notes.map((nt) => ({
-      id: nt.id, type: 'note' as const, position: { x: nt.x, y: nt.y },
-      data: { text: nt.text, s: nt.s ?? 1, onText: noteText, onRemove: noteRemove, onScale: scaleNode },
-    }));
+    const noteNodes: CanvasNode[] = layout.notes.map((nt) => {
+      const p = at(nt.id);
+      const date = dateOf(nt.id);
+      return {
+        id: nt.id, type: 'note' as const,
+        position: mode === 'timeline' ? { x: p.x, y: p.y } : { x: nt.x, y: nt.y },
+        data: {
+          text: nt.text, s: nt.s ?? 1,
+          ...(date !== undefined ? { date } : {}),
+          onText: noteText, onRemove: noteRemove, onScale: scaleNode,
+        },
+      };
+    });
     setNodes([...intentNodes, ...ghostNodes, ...noteNodes]);
 
     // 开场视口：上次离开在哪儿，这次就在哪儿（视口也是布局）；从没存过才 fitView。
@@ -286,7 +393,15 @@ export default function App() {
       }, 80);
     }
 
-    const known = new Set(union.map((u) => u.id));
+    const known = new Set([...union.map((u) => u.id), ...layout.notes.map((n) => n.id)]);
+    // 原生连线：人画的批注，黄点线，能删。
+    const linkEdges: Edge[] = (layout.links ?? [])
+      .filter((k) => known.has(k.from) && known.has(k.to))
+      .map((k) => ({
+        id: `l-${k.id}`, source: k.from, target: k.to,
+        style: { stroke: '#d9c26a', strokeDasharray: '2 6', strokeWidth: 1.6, opacity: 0.85 },
+        ...(k.label !== undefined ? { label: k.label } : {}),
+      }));
     const birth: Edge[] = tree.nodes
       .filter((n) => n.parent !== null)
       .map((n) => ({
@@ -314,11 +429,13 @@ export default function App() {
         });
       }
     }
-    setEdges([...birth, ...ghostEdges, ...merged]);
-  }, [tree, proposals, layout, noteText, noteRemove, adoptGhost, scaleNode, setNodes, setViewport, fitView]);
+    setEdges([...birth, ...ghostEdges, ...merged, ...linkEdges]);
+  }, [tree, proposals, layout, mode, noteText, noteRemove, adoptGhost, scaleNode, setNodes, setViewport, fitView]);
 
   // 拖完，位置归档（保留尺度）——这是画布唯一"写"的东西之一。
+  // 时间轴是投影（位置是算出来的），不落盘。
   const onDragStop: OnNodeDrag<CanvasNode> = useCallback((_e, node) => {
+    if (mode !== 'free') return;
     if (node.type === 'note') {
       mutateLayout((l) => ({
         ...l,
@@ -339,7 +456,27 @@ export default function App() {
         };
       });
     }
-  }, [mutateLayout]);
+  }, [mutateLayout, mode]);
+
+  /** 删除键：只删得动原生的。出生边/融合边是痕迹的投影，意图不是删除键能删的。 */
+  const onEdgesDelete = useCallback((deleted: Edge[]) => {
+    const native = deleted.filter((e) => e.id.startsWith('l-')).map((e) => e.id.slice(2));
+    if (native.length > 0) {
+      mutateLayout((l) => ({ ...l, links: (l.links ?? []).filter((k) => !native.includes(k.id)) }));
+    }
+    if (deleted.some((e) => !e.id.startsWith('l-'))) {
+      oops('出生边/融合边是痕迹的投影，画布上删不掉');
+      void reload();                       // 立刻把被视觉上摘掉的真相边放回来
+    }
+  }, [mutateLayout, reload]);
+
+  const onNodesDelete = useCallback((deleted: CanvasNode[]) => {
+    const notes = deleted.filter((n) => n.type === 'note').map((n) => n.id);
+    for (const id of notes) noteRemove(id);
+    if (deleted.some((n) => n.type === 'intent')) {
+      oops('意图不是删除键能删的——用「不做了」，理由会进痕迹');
+    }
+  }, [noteRemove]);
 
   const onNodeClick: NodeMouseHandler<CanvasNode> = useCallback((_e, node) => {
     setSelectedId(node.type === 'intent' ? node.id : null);
@@ -362,7 +499,7 @@ export default function App() {
     const s = clampScale(1 / getViewport().zoom);
     mutateLayout((l) => ({
       ...l,
-      notes: [...l.notes, { id: crypto.randomUUID(), x: p.x, y: p.y, s, text: '' }],
+      notes: [...l.notes, { id: crypto.randomUUID(), x: p.x, y: p.y, s, t: Date.now(), text: '' }],
     }));
   }, [mutateLayout, screenToFlowPosition, getViewport]);
 
@@ -399,6 +536,10 @@ export default function App() {
         <span className="ghost-count dim">
           {proposals.length > 0 ? `幽灵 ${proposals.length} 条待认领` : ''}
         </span>
+        <span className="mode-toggle">
+          <button className={mode === 'free' ? 'here' : ''} onClick={() => switchMode('free')}>自由</button>
+          <button className={mode === 'timeline' ? 'here' : ''} onClick={() => switchMode('timeline')}>时间轴</button>
+        </span>
         <form className="say" onSubmit={(e) => {
           e.preventDefault();
           const text = sayText.trim();
@@ -424,6 +565,13 @@ export default function App() {
           onNodeDragStop={onDragStop}
           onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDoubleClick}
+          onConnect={onConnect}
+          onEdgesChange={onEdgesChange}
+          onEdgesDelete={onEdgesDelete}
+          onNodesDelete={onNodesDelete}
+          connectionMode={ConnectionMode.Loose}
+          deleteKeyCode={['Backspace', 'Delete']}
+          nodesDraggable={mode === 'free'}
           onPaneClick={() => setSelectedId(null)}
           onMoveEnd={(_e, vp) => {
             if (layoutRef.current === null || !initialViewDone.current) return;
@@ -486,6 +634,36 @@ export default function App() {
             </div>
             <button className="p-close" onClick={() => setSelectedId(null)}>关</button>
           </aside>
+        )}
+
+        {pendingConnect !== null && (
+          <div className="connect-ask">
+            <div className="ca-title">
+              把「{tree?.nodes.find((n) => n.id === pendingConnect.a)?.saying ?? '…'}」
+              和「{tree?.nodes.find((n) => n.id === pendingConnect.b)?.saying ?? '…'}」连起来——
+            </div>
+            <input
+              value={mergeWhy}
+              onChange={(e) => setMergeWhy(e.target.value)}
+              placeholder="要是融合，说一句为什么是一件事（可选）…"
+            />
+            <div className="ca-actions">
+              <button onClick={() => {
+                const { a, b } = pendingConnect;
+                setPendingConnect(null);
+                void (async () => {
+                  try {
+                    await act('merge', { a, b, ...(mergeWhy.trim() !== '' ? { why: mergeWhy.trim() } : {}) });
+                    await reload();
+                  } catch (e) { oops(e); }
+                })();
+              }}>是一件事（融合，进痕迹）</button>
+              <button onClick={() => { addLink(pendingConnect.a, pendingConnect.b); setPendingConnect(null); }}>
+                只是相关（画条线，仅布局）
+              </button>
+              <button className="ca-cancel" onClick={() => setPendingConnect(null)}>算了</button>
+            </div>
+          </div>
         )}
 
         {err !== '' && <div className="toast">{err}</div>}

@@ -1,4 +1,5 @@
-// 和服务端的五条线：树（现场折叠）、提议（幽灵）、布局（位置+便签）、动作（人的门）、变更通知。
+// 和服务端的五条线：树（现场折叠）、提议（幽灵）、布局（位置+便签+连线+视图）、
+// 动作（人的门）、变更通知。
 
 export interface TreeNode {
   id: string;
@@ -15,10 +16,14 @@ export interface TreeData { current: string | null; line: string; nodes: TreeNod
 /** agent 提的、还没被回应的：画成幽灵，认了才上树。 */
 export interface Proposal { id: string; text: string; ts: string; parent: string | null }
 
-export interface Note { id: string; x: number; y: number; w?: number; h?: number; s?: number; text: string }
+export interface Note { id: string; x: number; y: number; w?: number; h?: number; s?: number; t?: number; text: string }
+/** 原生连线：人画的关联批注——和出生边/融合边（痕迹的投影）不是一个东西。 */
+export interface Link { id: string; from: string; to: string; label?: string }
 export interface Layout {
   positions: Record<string, { x: number; y: number; s?: number }>;
   notes: Note[];
+  links?: Link[];
+  mode?: 'free' | 'timeline';
   viewport?: { x: number; y: number; zoom: number };
 }
 
@@ -45,8 +50,8 @@ export const saveLayout = async (l: Layout): Promise<void> => {
 };
 
 export const act = async (
-  kind: 'adopt' | 'resume' | 'done' | 'drop',
-  params: { text?: string; target?: string; why?: string; accepting?: string; under?: string },
+  kind: 'adopt' | 'resume' | 'done' | 'drop' | 'merge',
+  params: { text?: string; target?: string; why?: string; accepting?: string; under?: string; a?: string; b?: string },
 ): Promise<{ id: string }> => {
   const res = await must(await fetch('/api/act', {
     method: 'POST', headers: { 'content-type': 'application/json' },

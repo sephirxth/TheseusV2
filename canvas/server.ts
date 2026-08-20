@@ -42,10 +42,15 @@ class LayoutRefused extends Error {
 
 // `s` 是创建时的缩放尺度（世界尺寸倍率）：缩得远建的东西大，凑近建的小——
 // 大小本身是人赋予的语义（2021 年那句"字号表意，但我不想知道字号是多少"）。
-interface Note { id: string; x: number; y: number; w?: number; h?: number; s?: number; text: string }
+interface Note { id: string; x: number; y: number; w?: number; h?: number; s?: number; t?: number; text: string }
+/** 原生连线：人画的关联，只是批注——和出生边/融合边（痕迹的投影）不是一个东西。 */
+interface Link { id: string; from: string; to: string; label?: string }
 interface Layout {
   positions: Record<string, { x: number; y: number; s?: number }>;
   notes: Note[];
+  links?: Link[];
+  /** 视图投影：自由布局 / 时间轴。同一份真相，多种组织形式。 */
+  mode?: 'free' | 'timeline';
   viewport?: { x: number; y: number; zoom: number };
 }
 
@@ -70,7 +75,7 @@ function checkLayout(raw: unknown): Layout {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     throw new LayoutRefused('布局必须是一个对象');
   }
-  onlyKeys(raw, ['positions', 'notes', 'viewport'], '布局');
+  onlyKeys(raw, ['positions', 'notes', 'links', 'mode', 'viewport'], '布局');
   const r = raw as Record<string, unknown>;
 
   const positions: Layout['positions'] = {};
@@ -91,7 +96,7 @@ function checkLayout(raw: unknown): Layout {
     if (!Array.isArray(r['notes'])) throw new LayoutRefused('notes 必须是数组');
     for (const [i, n] of (r['notes'] as unknown[]).entries()) {
       if (typeof n !== 'object' || n === null) throw new LayoutRefused(`notes[${i}] 必须是对象`);
-      onlyKeys(n, ['id', 'x', 'y', 'w', 'h', 's', 'text'], `notes[${i}]`);
+      onlyKeys(n, ['id', 'x', 'y', 'w', 'h', 's', 't', 'text'], `notes[${i}]`);
       const q = n as Record<string, unknown>;
       const note: Note = {
         id: aString(q['id'], `notes[${i}].id`),
@@ -102,11 +107,33 @@ function checkLayout(raw: unknown): Layout {
       if (q['w'] !== undefined) note.w = aNumber(q['w'], `notes[${i}].w`);
       if (q['h'] !== undefined) note.h = aNumber(q['h'], `notes[${i}].h`);
       if (q['s'] !== undefined) note.s = aNumber(q['s'], `notes[${i}].s`);
+      if (q['t'] !== undefined) note.t = aNumber(q['t'], `notes[${i}].t`);
       notes.push(note);
     }
   }
 
   const out: Layout = { positions, notes };
+  if (r['mode'] !== undefined) {
+    if (r['mode'] !== 'free' && r['mode'] !== 'timeline') throw new LayoutRefused(`mode 只认 free / timeline`);
+    out.mode = r['mode'];
+  }
+  if (r['links'] !== undefined) {
+    if (!Array.isArray(r['links'])) throw new LayoutRefused('links 必须是数组');
+    const links: Link[] = [];
+    for (const [i, k] of (r['links'] as unknown[]).entries()) {
+      if (typeof k !== 'object' || k === null) throw new LayoutRefused(`links[${i}] 必须是对象`);
+      onlyKeys(k, ['id', 'from', 'to', 'label'], `links[${i}]`);
+      const q = k as Record<string, unknown>;
+      const link: Link = {
+        id: aString(q['id'], `links[${i}].id`),
+        from: aString(q['from'], `links[${i}].from`),
+        to: aString(q['to'], `links[${i}].to`),
+      };
+      if (q['label'] !== undefined) link.label = aString(q['label'], `links[${i}].label`);
+      links.push(link);
+    }
+    out.links = links;
+  }
   if (r['viewport'] !== undefined) {
     const v = r['viewport'];
     if (typeof v !== 'object' || v === null) throw new LayoutRefused('viewport 必须是对象');
@@ -209,6 +236,13 @@ function act(b: Record<string, unknown>): { id: string } {
     const why = String(b['why'] ?? '').trim();
     if (why === '') throw new IntentRefused('没有为什么。放弃的理由是将来"要不要捡回来"的唯一依据');
     return { id: intent.drop({ said: say(`不做了：${sayingOf(target)}——${why}`).id, target, why }).id };
+  }
+  if (kind === 'merge') {
+    const a = String(b['a'] ?? '');
+    const bb = String(b['b'] ?? '');
+    const why = String(b['why'] ?? '').trim();
+    const h = say(`这俩是一件事：「${sayingOf(a)}」和「${sayingOf(bb)}」${why !== '' ? `——${why}` : ''}`);
+    return { id: intent.merge({ said: h.id, a, b: bb, ...(why !== '' ? { why } : {}) }).id };
   }
   throw new IntentRefused(`不认识的动作 '${kind}'`);
 }
