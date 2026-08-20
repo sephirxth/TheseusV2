@@ -1,5 +1,5 @@
 import {
-  Background, Controls, MiniMap, ReactFlow, useNodesState, useReactFlow,
+  Background, Controls, MiniMap, Panel, ReactFlow, useNodesState, useReactFlow, useViewport,
   MarkerType, type Edge, type NodeMouseHandler, type OnNodeDrag,
 } from '@xyflow/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -20,6 +20,36 @@ const cleanText = (t: string): string => t.replace(/ ⏸$/u, '');
 /** 创建时的世界尺度 = 1/当时的缩放，夹在可读范围里。 */
 const clampScale = (v: number): number => Math.min(10, Math.max(0.35, v));
 
+const MIN_ZOOM = 0.05;
+const MAX_ZOOM = 4;
+
+/** 层级条：全景 + 四个常驻层（数字键 0–4 直达），顺带显示现在在第几层。 */
+const LAYERS: { key: string; label: string; zoom: number }[] = [
+  { key: '1', label: '大局 0.1×', zoom: 0.1 },
+  { key: '2', label: '中景 0.3×', zoom: 0.3 },
+  { key: '3', label: '阅读 1×', zoom: 1 },
+  { key: '4', label: '细节 2×', zoom: 2 },
+];
+
+function LayerBar() {
+  const { zoom } = useViewport();
+  const { zoomTo, fitView } = useReactFlow();
+  return (
+    <Panel position="bottom-center" className="layerbar">
+      <button title="快捷键 0" onClick={() => void fitView({ duration: 350, padding: 0.15 })}>全景</button>
+      {LAYERS.map((l) => (
+        <button
+          key={l.key}
+          title={`快捷键 ${l.key}`}
+          className={Math.abs(zoom - l.zoom) / l.zoom < 0.25 ? 'here' : ''}
+          onClick={() => void zoomTo(l.zoom, { duration: 300 })}
+        >{l.label}</button>
+      ))}
+      <span className="zoom-now">{zoom >= 1 ? `${zoom.toFixed(1)}×` : `${(zoom * 100).toFixed(0)}%`}</span>
+    </Panel>
+  );
+}
+
 export default function App() {
   const [tree, setTree] = useState<TreeData | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -33,7 +63,46 @@ export default function App() {
   const dirty = useRef(false);
   /** 本次渲染里每个东西实际落在哪（含自动摆位的），认领实体化时按这个原位落地。 */
   const posRef = useRef<Record<string, { x: number; y: number; s: number }>>({});
-  const { screenToFlowPosition, getViewport } = useReactFlow();
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const { screenToFlowPosition, getViewport, setViewport, setCenter, zoomTo, fitView } = useReactFlow();
+
+  // 滚轮提速：每格约 ×1.5（两格翻倍），指向光标缩放；Alt 精调；触控板捏合走同一条路。
+  // 默认的滚轮步长跨 0.05×→1× 要几十格——层与层离得远，步子必须大。
+  useEffect(() => {
+    const el = stageRef.current;
+    if (el === null) return;
+    const onWheel = (e: WheelEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t !== null && t.closest('.panel, .layerbar, textarea, input, select') !== null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const dy = (e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY) * (e.ctrlKey ? 3 : 1);
+      const speed = e.altKey ? 0.001 : 0.004;
+      const vp = getViewport();
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, vp.zoom * Math.exp(-dy * speed)));
+      const rect = el.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const fx = (px - vp.x) / vp.zoom;
+      const fy = (py - vp.y) / vp.zoom;
+      void setViewport({ x: px - fx * z, y: py - fy * z, zoom: z });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false, capture: true });
+    return () => el.removeEventListener('wheel', onWheel, { capture: true });
+  }, [getViewport, setViewport]);
+
+  // 数字键直达层级：0 全景，1–4 对应层级条。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t !== null && t.closest('textarea, input, select') !== null) return;
+      if (e.key === '0') { void fitView({ duration: 350, padding: 0.15 }); return; }
+      const hit = LAYERS.find((l) => l.key === e.key);
+      if (hit !== undefined) void zoomTo(hit.zoom, { duration: 300 });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fitView, zoomTo]);
 
   const oops = (e: unknown) => {
     setErr(e instanceof Error ? e.message : String(e));
@@ -210,6 +279,17 @@ export default function App() {
     setWhyText('');
   }, []);
 
+  /** 双击一个东西 = 跳到它的层级：缩放到 1/s（它的字回到基准大小）并居中。 */
+  const onNodeDoubleClick: NodeMouseHandler<CanvasNode> = useCallback((_e, node) => {
+    const s = 's' in node.data ? node.data.s : 1;
+    const w = node.measured?.width ?? 200;
+    const h = node.measured?.height ?? 80;
+    void setCenter(node.position.x + w / 2, node.position.y + h / 2, {
+      zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, 1 / s)),
+      duration: 350,
+    });
+  }, [setCenter]);
+
   const addNoteAt = useCallback((x: number, y: number) => {
     const p = screenToFlowPosition({ x, y });
     const s = clampScale(1 / getViewport().zoom);
@@ -268,7 +348,7 @@ export default function App() {
         </form>
       </header>
 
-      <div className="stage">
+      <div className="stage" ref={stageRef}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -276,10 +356,14 @@ export default function App() {
           onNodesChange={onNodesChange}
           onNodeDragStop={onDragStop}
           onNodeClick={onNodeClick}
+          onNodeDoubleClick={onNodeDoubleClick}
           onPaneClick={() => setSelectedId(null)}
           zoomOnDoubleClick={false}
+          zoomOnScroll={false}
+          panOnScroll={false}
           fitView
-          minZoom={0.05}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={24} />
@@ -287,6 +371,7 @@ export default function App() {
           <MiniMap pannable zoomable nodeColor={(n) =>
             n.type === 'note' ? '#d9c26a' : n.type === 'ghost' ? '#565a63' : '#7a9ec9'
           } />
+          <LayerBar />
         </ReactFlow>
 
         {tree !== null && tree.nodes.length === 0 && proposals.length === 0 && (
