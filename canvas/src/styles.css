@@ -176,6 +176,22 @@ header {
 .ca-actions button:nth-child(2) { background: var(--bg); color: var(--note); border: 1px solid #4b452e; }
 .ca-actions .ca-cancel { background: transparent; color: var(--dim); border: 1px solid var(--line); }
 
+/* 时间轴投影：底部年月日轴 + 泳道导线（全在画布坐标系里，随平移缩放走） */
+.tl-axisline, .tl-grid, .tl-ticklabel, .tl-lane-line, .tl-lane-label {
+  position: absolute; top: 0; left: 0; pointer-events: none;
+}
+.tl-axisline { height: 2px; background: var(--accent); opacity: .8; }
+.tl-grid { width: 1px; background: var(--line); opacity: .6; }
+.tl-ticklabel {
+  color: var(--accent); font-size: 13px; font-family: ui-monospace, monospace;
+  white-space: nowrap; opacity: .95;
+}
+.tl-lane-line { height: 1px; background: var(--open); opacity: .16; }
+.tl-lane-label {
+  color: var(--dim); font-size: 13px; white-space: nowrap; opacity: .9;
+  background: var(--bg); padding: 1px 6px; border-radius: 5px;
+}
+
 /* 时间签 */
 .tag-date { color: var(--dim); }
 .g-chip .tag-date { margin-left: .5em; font-size: 1em; }

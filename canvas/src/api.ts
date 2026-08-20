@@ -13,8 +13,8 @@ export interface TreeNode {
 }
 export interface TreeData { current: string | null; line: string; nodes: TreeNode[] }
 
-/** agent 提的、还没被回应的：画成幽灵，认了才上树。 */
-export interface Proposal { id: string; text: string; ts: string; parent: string | null }
+/** agent 提的、还没被回应的：画成幽灵，认了才上树。at = 它所指之事的登记日期。 */
+export interface Proposal { id: string; text: string; at: string | null; ts: string; parent: string | null }
 
 export interface Note { id: string; x: number; y: number; w?: number; h?: number; s?: number; t?: number; text: string }
 /** 原生连线：人画的关联批注——和出生边/融合边（痕迹的投影）不是一个东西。 */

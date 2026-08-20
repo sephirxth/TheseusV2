@@ -31,12 +31,15 @@ const body = raw.includes('## 树') ? raw.slice(raw.indexOf('## 树')) : raw;
 
 const PAT = /^(\s*)- \[(🔵|⏸|✅|❌)\] (.+?)(?:\s*\((\d{4}-\d{2}-\d{2})\))?\s*(?:—|$)/u;
 
-interface Row { indent: number; status: string; name: string }
+interface Row { indent: number; status: string; name: string; at: string | null }
 const rows: Row[] = [];
 for (const ln of body.split('\n')) {
   const m = PAT.exec(ln);
   if (m === null) continue;
-  rows.push({ indent: (m[1] ?? '').length, status: m[2] ?? '', name: (m[3] ?? '').trim() });
+  rows.push({
+    indent: (m[1] ?? '').length, status: m[2] ?? '', name: (m[3] ?? '').trim(),
+    at: m[4] ?? null,                              // 旧树上登记的日期：时间轴靠它落位
+  });
 }
 
 const trace = new Trace(DB);
@@ -55,11 +58,12 @@ for (const r of rows) {
     continue;
   }
   const text = r.status === '⏸' ? `${r.name} ⏸` : r.name;
-  const idem = `seed:oldtree:${createHash('sha256').update(`${parent ?? ''}|${r.name}`).digest('hex')}`;
+  const idem = `seed:oldtree:${createHash('sha256').update(`${parent ?? ''}|${r.name}|${r.at ?? ''}`).digest('hex')}`;
   const step = intent.propose({
     text,
     origin: 'arrived-from-outside',
     ...(parent !== null ? { about: [parent] } : {}),
+    ...(r.at !== null ? { at: r.at } : {}),
     idem,
   });
   stack.push({ indent: r.indent, id: step.id });

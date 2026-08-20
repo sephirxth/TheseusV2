@@ -187,15 +187,31 @@ function treeJson(): { current: string | null; line: string; nodes: TreeNodeOut[
 /**
  * 还没被回应的提议（agent 提的、树上不算数的那些）。前端把它们画成幽灵树。
  * "被回应"只认树的动词——提议之间的引用（父子）不算回应。
+ *
+ * 同一条猜测被提过多遍（比如带着更全的信息重提）时，只露最新的一遍：
+ * 按「父文本|文本」去重、保最大号——而且去重在"被回应"过滤**之前**做，
+ * 这样新的一遍被认领后，旧的一遍不会又冒出来。
  */
-function proposalsJson(): { id: string; text: string; ts: string; parent: string | null }[] {
-  return trace.ofType('intent.proposed')
+function proposalsJson(): { id: string; text: string; at: string | null; ts: string; parent: string | null }[] {
+  const all = trace.ofType('intent.proposed').map((p) => ({
+    id: p.id,
+    text: String(p.payload['text'] ?? ''),
+    at: typeof p.payload['at'] === 'string' ? p.payload['at'] : null,
+    ts: p.ts,
+    parent: p.basis[0] ?? null,
+  }));
+  const textOf = new Map(all.map((r) => [r.id, r.text]));
+  const best = new Map<string, typeof all[number]>();
+  for (const r of all) {
+    const key = `${r.parent !== null ? (textOf.get(r.parent) ?? r.parent) : ''}|${r.text}`;
+    const prev = best.get(key);
+    if (prev === undefined || prev.id < r.id) best.set(key, r);
+  }
+  return [...best.values()]
     .filter((p) => !trace.became(p.id).some(
       (s) => s.type.startsWith('intent.') && s.type !== 'intent.proposed',
     ))
-    .map((p) => ({
-      id: p.id, text: String(p.payload['text'] ?? ''), ts: p.ts, parent: p.basis[0] ?? null,
-    }));
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
 // ─────────────────────────────── 动作：面板是人的门 ───────────────────────────────

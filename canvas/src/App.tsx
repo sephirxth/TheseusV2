@@ -1,9 +1,9 @@
 import {
-  Background, ConnectionMode, Controls, MiniMap, Panel, ReactFlow,
+  Background, ConnectionMode, Controls, MiniMap, Panel, ReactFlow, ViewportPortal,
   useEdgesState, useNodesState, useReactFlow, useViewport,
   MarkerType, type Connection, type Edge, type NodeMouseHandler, type OnNodeDrag,
 } from '@xyflow/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { act, fetchLayout, fetchProposals, fetchTree, onChange, saveLayout } from './api';
 import type { Layout, Proposal, TreeData, TreeNode } from './api';
 import { autoPlace, type Placeable } from './layout';
@@ -28,6 +28,16 @@ const fmtDate = (ms: number): string => {
   const d = new Date(ms);
   return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
+
+/** 时间轴投影的轴：底部年月日刻度 + 每条意图线一条泳道导线。 */
+interface AxisData {
+  x0: number;
+  width: number;
+  top: number;
+  axisY: number;
+  ticks: { x: number; label: string }[];
+  lanes: { y: number; label: string }[];
+}
 
 /** 层级条：全景 + 四个常驻层（数字键 0–4 直达），顺带显示现在在第几层。 */
 const LAYERS: { key: string; label: string; zoom: number }[] = [
@@ -68,6 +78,7 @@ export default function App() {
   const [err, setErr] = useState('');
   /** 视图投影：自由布局（人摆的）/ 时间轴（横轴时间、纵轴意图线，算出来的）。 */
   const [mode, setMode] = useState<'free' | 'timeline'>('free');
+  const [axis, setAxis] = useState<AxisData | null>(null);
   /** 两条真意图之间拖了线：问一句是"融合"还是"只是相关"。 */
   const [pendingConnect, setPendingConnect] = useState<{ a: string; b: string } | null>(null);
   const [mergeWhy, setMergeWhy] = useState('');
@@ -287,14 +298,14 @@ export default function App() {
     ];
     const auto = autoPlace(union, layout.positions);
 
-    // 时间轴投影：横轴 = 时序（全体按时间排位），纵轴 = 意图线（每个根一条泳道，便签一条底道）。
-    // 投影是算出来的视图，不动自由布局里人摆的位置。
+    // 时间轴投影：横轴 = 真实时间（底部年月日刻度），纵轴 = 意图线（每个根一条泳道，
+    // 便签一条底道）。投影是算出来的视图，不动自由布局里人摆的位置。
     const unionById = new Map(union.map((u) => [u.id, u]));
     const timeOf = (id: string): number => {
       const k0 = tree.nodes.find((n) => n.id === id);
       if (k0 !== undefined) return Date.parse(k0.bornOf?.ts ?? k0.lastTouched);
       const g = proposals.find((p) => p.id === id);
-      if (g !== undefined) return Date.parse(g.ts);
+      if (g !== undefined) return Date.parse(g.at ?? g.ts);   // 幽灵优先用它所指之事的登记日期
       const nt = layout.notes.find((n) => n.id === id);
       return nt?.t ?? Date.now();
     };
@@ -307,20 +318,76 @@ export default function App() {
       }
       return cur;
     };
+    const labelOf = (id: string): string => {
+      const n = tree.nodes.find((x) => x.id === id);
+      const raw = n !== undefined ? n.saying : cleanText(proposals.find((p) => p.id === id)?.text ?? id);
+      return raw.length > 14 ? `${raw.slice(0, 14)}…` : raw;
+    };
     const timeline: Record<string, { x: number; y: number }> = {};
+    let axisData: AxisData | null = null;
     if (mode === 'timeline') {
       const allIds = [...union.map((u) => u.id), ...layout.notes.map((n) => n.id)];
-      const ordered = [...allIds].sort((a, b) => timeOf(a) - timeOf(b));
-      const rank = new Map(ordered.map((id, i) => [id, i]));
+      const times = new Map(allIds.map((id) => [id, timeOf(id)]));
       const roots = [...new Set(union.map((u) => laneRootOf(u.id)))]
-        .sort((a, b) => timeOf(a) - timeOf(b));
-      const laneOf = new Map(roots.map((r, i) => [r, i]));
-      const noteLane = roots.length;                     // 便签一条底道
+        .sort((a, b) => (times.get(a) ?? 0) - (times.get(b) ?? 0));
+      const laneIdx = new Map(roots.map((r, i) => [r, i]));
+      const noteLane = roots.length;
+      const laneOf = (id: string): number =>
+        unionById.has(id) ? (laneIdx.get(laneRootOf(id)) ?? noteLane) : noteLane;
+
+      const tsAll = [...times.values()];
+      const minT = Math.min(...tsAll);
+      const maxT = Math.max(...tsAll);
+      const days = Math.max(1, (maxT - minT) / 86_400_000);
+      const pxPerDay = Math.max(24, Math.min(260, 9000 / days));
+      const X0 = 120;
+      const rawX = (t: number): number => X0 + ((t - minT) / 86_400_000) * pxPerDay;
+      const LANE_H = 170;
+
+      // 泳道内按时间排；同一天挤在一起时往右让位（保持时序，不叠牌）
+      const byLane = new Map<number, string[]>();
       for (const id of allIds) {
-        const lane = unionById.has(id) ? (laneOf.get(laneRootOf(id)) ?? noteLane) : noteLane;
-        timeline[id] = { x: 80 + (rank.get(id) ?? 0) * 280, y: 80 + lane * 170 };
+        const l = laneOf(id);
+        const list = byLane.get(l) ?? [];
+        list.push(id);
+        byLane.set(l, list);
       }
+      let maxX = X0;
+      for (const [lane, ids] of byLane) {
+        ids.sort((a, b) => ((times.get(a) ?? 0) - (times.get(b) ?? 0)) || (a < b ? -1 : 1));
+        let prev = -Infinity;
+        for (const id of ids) {
+          const x = Math.max(rawX(times.get(id) ?? minT), prev + 250);
+          prev = x;
+          timeline[id] = { x, y: 80 + lane * LANE_H };
+          if (x > maxX) maxX = x;
+        }
+      }
+
+      // 底部时间轴：按跨度选步长（1/2/7/14/30 天），首刻与跨年处带年份
+      const laneCount = roots.length + (byLane.has(noteLane) ? 1 : 0);
+      const axisY = 80 + laneCount * LANE_H + 20;
+      const stepDays = days <= 16 ? 1 : days <= 32 ? 2 : days <= 112 ? 7 : days <= 224 ? 14 : 30;
+      const ticks: { x: number; label: string }[] = [];
+      const d0 = new Date(minT);
+      d0.setHours(0, 0, 0, 0);
+      let lastYear = '';
+      for (let t = d0.getTime(); t <= maxT + stepDays * 86_400_000; t += stepDays * 86_400_000) {
+        const d = new Date(t);
+        const yr = String(d.getFullYear());
+        const label = `${yr !== lastYear ? `${yr}-` : ''}${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        lastYear = yr;
+        ticks.push({ x: rawX(t), label });
+      }
+      const lanes = roots.map((r, i) => ({ y: 80 + i * LANE_H + 34, label: labelOf(r) }));
+      if (byLane.has(noteLane)) lanes.push({ y: 80 + noteLane * LANE_H + 34, label: '便签' });
+      const lastTickX = ticks[ticks.length - 1]?.x ?? maxX;
+      axisData = {
+        x0: X0 - 60, top: 30, axisY, ticks, lanes,
+        width: Math.max(maxX, lastTickX) - (X0 - 60) + 240,
+      };
     }
+    setAxis(axisData);
 
     const at = (id: string): { x: number; y: number; s: number } => {
       const stored = layout.positions[id];
@@ -591,6 +658,36 @@ export default function App() {
             n.type === 'note' ? '#d9c26a' : n.type === 'ghost' ? '#565a63' : '#7a9ec9'
           } />
           <LayerBar />
+          {mode === 'timeline' && axis !== null && (
+            <ViewportPortal>
+              <div
+                className="tl-axisline"
+                style={{ transform: `translate(${axis.x0}px, ${axis.axisY}px)`, width: axis.width }}
+              />
+              {axis.ticks.map((t, i) => (
+                <Fragment key={`t${i}`}>
+                  <div
+                    className="tl-grid"
+                    style={{ transform: `translate(${t.x}px, ${axis.top}px)`, height: axis.axisY - axis.top }}
+                  />
+                  <div className="tl-ticklabel" style={{ transform: `translate(${t.x - 36}px, ${axis.axisY + 12}px)` }}>
+                    {t.label}
+                  </div>
+                </Fragment>
+              ))}
+              {axis.lanes.map((l, i) => (
+                <Fragment key={`n${i}`}>
+                  <div
+                    className="tl-lane-line"
+                    style={{ transform: `translate(${axis.x0}px, ${l.y}px)`, width: axis.width }}
+                  />
+                  <div className="tl-lane-label" style={{ transform: `translate(${axis.x0}px, ${l.y - 44}px)` }}>
+                    {l.label}
+                  </div>
+                </Fragment>
+              ))}
+            </ViewportPortal>
+          )}
         </ReactFlow>
 
         {tree !== null && tree.nodes.length === 0 && proposals.length === 0 && (
