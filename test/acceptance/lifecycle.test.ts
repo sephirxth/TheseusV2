@@ -399,6 +399,15 @@ const JUDGED: readonly (readonly [string, Verdict])[] = [
   ['先让桥把料备齐，桌面那份需求才有东西可摊', 'design-method'],
   ['（2026-08-19 游渊定：先做桥）', 'deferred'],
   ['等桥在我最常说话的地方先立住', 'deferred'],
+
+  // docs/requirements/canvas.md 进仓后补判（2026-08-20）。逐句判过，5 句：
+  // 讲这份需求被要过四回的来历 = history；排序讲道理 = design-method；
+  // "我记得在右上角"是空间记忆的亲历叙述 = history。
+  ['桥的需求里把它列为"没写成用例的第一件"——先做桥', 'history'],
+  ['前三回都塌在同一个地方：画布先行，地基空缺', 'history'],
+  ['这一回不同：地基先有了', 'design-method'],
+  ['我记得那个想法"在右上角，挨着那一簇"', 'history'],
+  ['先立骨头，再谈镜头', 'design-method'],
 ];
 
 test('U2-4: 我没有被要求按任何顺序做事 —— 扫全部文档，没有一句"先…再…"是写给操作者的', () => {

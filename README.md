@@ -66,6 +66,7 @@ flowchart LR
 | **Intent tree** | What I'm pursuing and where it came from, folded from the trace | U15–U19 | ✅ Implemented + accepted |
 | **Loop** | Event → something notices → action → new trace | U20–U24 | 📋 Requirements written (with failure scenarios) |
 | **Bridge** | The switching experience: hand off one sentence and walk away, re-enter any window in one glance, see which line is waiting on me | U25–U29 | 📋 Requirements written (with failure scenarios) |
+| **Canvas** | The second entry point: an infinite surface where arranging things IS thinking, layout belongs to the human, truth stays single-sourced | U30–U34 | 📋 Requirements written (with failure scenarios) |
 
 Each module moves through the same pipeline: requirements (no technical vocabulary allowed) → design (citing the prior art each choice borrows from) → acceptance spec (asserting the user's situation, not the mechanism's state) → implementation → mutation lock.
 
@@ -156,7 +157,7 @@ The self-built pieces are individually flagged (★) in the design docs and watc
 
 - **Bridge (U25–U29)** — design and implementation: make the multi-window, multi-machine working form survivable — zero-ceremony handoff, one-glance re-entry, attention routing across lines, dropping a note onto another line without jumping there, an enumerable list of open fronts.
 - **Loop (U20–U24)** — design and implementation: closing event → notice → act → trace, with an ask-me gate on irreversible actions and self-feeding protection.
-- **Intent canvas** — the tree spread out on an infinite, draggable surface; a second entry point, spec'd after the bridge lands.
+- **Canvas (U30–U34)** — requirements written (rooted in the author's 2021 PKM requirements and a working 2021 whiteboard prototype); design and implementation follow the bridge. Entry-point consistency (canvas vs. conversation) enters acceptance here.
 - **Ledger migration (U13)** — importing the old system's 149k-record ledger through the new gates.
 - **Cross-agent trace (U14)** — several agents writing one trace.
 - **Hermes Memory Provider bridge** — exposing the layered memory over a standard interface (`docs/TODO.md`).
