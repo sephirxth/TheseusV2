@@ -1,0 +1,4 @@
+packages:
+  - canvas
+allowBuilds:
+  esbuild: true

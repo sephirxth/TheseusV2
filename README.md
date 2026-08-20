@@ -66,7 +66,7 @@ flowchart LR
 | **Intent tree** | What I'm pursuing and where it came from, folded from the trace | U15–U19 | ✅ Implemented + accepted |
 | **Loop** | Event → something notices → action → new trace | U20–U24 | 📋 Requirements written (with failure scenarios) |
 | **Bridge** | The switching experience: hand off one sentence and walk away, re-enter any window in one glance, see which line is waiting on me | U25–U29 | 📋 Requirements written (with failure scenarios) |
-| **Canvas** | The second entry point: an infinite surface where arranging things IS thinking, layout belongs to the human, truth stays single-sourced | U30–U34 | 📋 Requirements written (with failure scenarios) |
+| **Canvas** | The second entry point: an infinite surface where arranging things IS thinking, layout belongs to the human, truth stays single-sourced | U30–U34 | 🔨 v0.1 shipped (`canvas/`), iterating directly |
 
 Each module moves through the same pipeline: requirements (no technical vocabulary allowed) → design (citing the prior art each choice borrows from) → acceptance spec (asserting the user's situation, not the mechanism's state) → implementation → mutation lock.
 
