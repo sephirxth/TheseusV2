@@ -60,36 +60,15 @@ export default function App() {
   const [sayText, setSayText] = useState('');
   const [whyText, setWhyText] = useState('');
   const [err, setErr] = useState('');
-  const dirty = useRef(false);
-  /** 本次渲染里每个东西实际落在哪（含自动摆位的），认领实体化时按这个原位落地。 */
+  /** 布局的唯一真身。state 只负责触发重画；存盘、视口、冲刷都走这个 ref。 */
+  const layoutRef = useRef<Layout | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialViewDone = useRef(false);
+  /** 本次渲染里每个东西实际落在哪（含自动摆位的），认领实体化/手调大小按这个原位落地。 */
   const posRef = useRef<Record<string, { x: number; y: number; s: number }>>({});
+  const kindRef = useRef<Record<string, 'intent' | 'ghost' | 'note'>>({});
   const stageRef = useRef<HTMLDivElement | null>(null);
   const { screenToFlowPosition, getViewport, setViewport, setCenter, zoomTo, fitView } = useReactFlow();
-
-  // 滚轮提速：每格约 ×1.5（两格翻倍），指向光标缩放；Alt 精调；触控板捏合走同一条路。
-  // 默认的滚轮步长跨 0.05×→1× 要几十格——层与层离得远，步子必须大。
-  useEffect(() => {
-    const el = stageRef.current;
-    if (el === null) return;
-    const onWheel = (e: WheelEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t !== null && t.closest('.panel, .layerbar, textarea, input, select') !== null) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const dy = (e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY) * (e.ctrlKey ? 3 : 1);
-      const speed = e.altKey ? 0.001 : 0.004;
-      const vp = getViewport();
-      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, vp.zoom * Math.exp(-dy * speed)));
-      const rect = el.getBoundingClientRect();
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
-      const fx = (px - vp.x) / vp.zoom;
-      const fy = (py - vp.y) / vp.zoom;
-      void setViewport({ x: px - fx * z, y: py - fy * z, zoom: z });
-    };
-    el.addEventListener('wheel', onWheel, { passive: false, capture: true });
-    return () => el.removeEventListener('wheel', onWheel, { capture: true });
-  }, [getViewport, setViewport]);
 
   // 数字键直达层级：0 全景，1–4 对应层级条。
   useEffect(() => {
@@ -121,22 +100,88 @@ export default function App() {
     void (async () => {
       try {
         const [t, p, l] = await Promise.all([fetchTree(), fetchProposals(), fetchLayout()]);
+        layoutRef.current = l;
         setTree(t); setProposals(p); setLayout(l);
       } catch (e) { oops(e); }
     })();
     return onChange(() => { void reload(); });
   }, [reload]);
 
-  // 布局归人：改了就存，存的只有位置、尺度和便签。
+  /** 布局自动保存：每次改动 400ms 后落盘；页面要走时立刻冲刷（keepalive），不丢最后一手。 */
+  const scheduleSave = useCallback(() => {
+    if (saveTimer.current !== null) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      if (layoutRef.current !== null) saveLayout(layoutRef.current).catch(oops);
+    }, 400);
+  }, []);
+
   useEffect(() => {
-    if (layout === null || !dirty.current) return;
-    const t = setTimeout(() => { dirty.current = false; saveLayout(layout).catch(oops); }, 400);
-    return () => clearTimeout(t);
-  }, [layout]);
+    const flush = () => {
+      if (saveTimer.current === null || layoutRef.current === null) return;
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      void fetch('/api/layout', {
+        method: 'PUT', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(layoutRef.current), keepalive: true,
+      });
+    };
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, []);
 
   const mutateLayout = useCallback((fn: (l: Layout) => Layout) => {
-    setLayout((l) => { if (l === null) return l; dirty.current = true; return fn(l); });
-  }, []);
+    if (layoutRef.current === null) return;
+    layoutRef.current = fn(layoutRef.current);
+    setLayout(layoutRef.current);
+    scheduleSave();
+  }, [scheduleSave]);
+
+  /** 手调大小：s 也是布局（"字号表意"的另一半——事后还能改）。 */
+  const scaleNode = useCallback((id: string, s: number) => {
+    if (kindRef.current[id] === 'note') {
+      mutateLayout((l) => ({ ...l, notes: l.notes.map((n) => (n.id === id ? { ...n, s } : n)) }));
+    } else {
+      const p = posRef.current[id] ?? { x: 0, y: 0, s: 1 };
+      mutateLayout((l) => ({ ...l, positions: { ...l.positions, [id]: { x: p.x, y: p.y, s } } }));
+    }
+  }, [mutateLayout]);
+
+  // 滚轮提速：每格约 ×1.5（两格翻倍），指向光标缩放；Alt 精调；触控板捏合走同一条路。
+  // 默认的滚轮步长跨 0.05×→1× 要几十格——层与层离得远，步子必须大。
+  useEffect(() => {
+    const el = stageRef.current;
+    if (el === null) return;
+    const onWheel = (e: WheelEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t !== null && t.closest('.panel, .layerbar, textarea, input, select') !== null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // Shift+滚轮悬停在节点上 = 调这个节点的大小（布局的一部分），不动镜头。
+      if (e.shiftKey && t !== null) {
+        const nodeEl = t.closest('.react-flow__node');
+        const id = nodeEl instanceof HTMLElement ? nodeEl.getAttribute('data-id') : null;
+        if (id !== null && id !== '') {
+          const dyn = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+          const s0 = posRef.current[id]?.s ?? 1;
+          scaleNode(id, Math.min(10, Math.max(0.35, s0 * Math.exp(-dyn * 0.0015))));
+          return;
+        }
+      }
+      const dy = (e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY) * (e.ctrlKey ? 3 : 1);
+      const speed = e.altKey ? 0.001 : 0.004;
+      const vp = getViewport();
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, vp.zoom * Math.exp(-dy * speed)));
+      const rect = el.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const fx = (px - vp.x) / vp.zoom;
+      const fy = (py - vp.y) / vp.zoom;
+      void setViewport({ x: px - fx * z, y: py - fy * z, zoom: z });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false, capture: true });
+    return () => el.removeEventListener('wheel', onWheel, { capture: true });
+  }, [getViewport, setViewport, scaleNode]);
 
   const noteText = useCallback((id: string, text: string) => {
     mutateLayout((l) => ({ ...l, notes: l.notes.map((n) => (n.id === id ? { ...n, text } : n)) }));
@@ -193,8 +238,16 @@ export default function App() {
       return { x: base.x, y: base.y, s: stored?.s ?? 1 };
     };
     const pmap: Record<string, { x: number; y: number; s: number }> = {};
+    const kmap: Record<string, 'intent' | 'ghost' | 'note'> = {};
     for (const u of union) pmap[u.id] = at(u.id);
+    for (const n of tree.nodes) kmap[n.id] = 'intent';
+    for (const g of proposals) kmap[g.id] = 'ghost';
+    for (const nt of layout.notes) {
+      kmap[nt.id] = 'note';
+      pmap[nt.id] = { x: nt.x, y: nt.y, s: nt.s ?? 1 };
+    }
     posRef.current = pmap;
+    kindRef.current = kmap;
 
     const intentNodes: CanvasNode[] = tree.nodes.map((n) => {
       const p = at(n.id);
@@ -203,6 +256,7 @@ export default function App() {
         data: {
           saying: n.saying, status: n.status, isCurrent: tree.current === n.id,
           mergedCount: n.mergedWith.length, bornText: n.bornOf?.text ?? '', s: p.s,
+          onScale: scaleNode,
         },
       };
     });
@@ -210,14 +264,27 @@ export default function App() {
       const p = at(g.id);
       return {
         id: g.id, type: 'ghost' as const, position: { x: p.x, y: p.y },
-        data: { text: cleanText(g.text), suspended: isSuspended(g.text), s: p.s, onAdopt: adoptGhost },
+        data: {
+          text: cleanText(g.text), suspended: isSuspended(g.text), s: p.s,
+          onAdopt: adoptGhost, onScale: scaleNode,
+        },
       };
     });
     const noteNodes: CanvasNode[] = layout.notes.map((nt) => ({
       id: nt.id, type: 'note' as const, position: { x: nt.x, y: nt.y },
-      data: { text: nt.text, s: nt.s ?? 1, onText: noteText, onRemove: noteRemove },
+      data: { text: nt.text, s: nt.s ?? 1, onText: noteText, onRemove: noteRemove, onScale: scaleNode },
     }));
     setNodes([...intentNodes, ...ghostNodes, ...noteNodes]);
+
+    // 开场视口：上次离开在哪儿，这次就在哪儿（视口也是布局）；从没存过才 fitView。
+    if (!initialViewDone.current) {
+      initialViewDone.current = true;
+      const vp = layout.viewport;
+      setTimeout(() => {
+        if (vp !== undefined) void setViewport(vp);
+        else void fitView({ padding: 0.15 });
+      }, 80);
+    }
 
     const known = new Set(union.map((u) => u.id));
     const birth: Edge[] = tree.nodes
@@ -248,7 +315,7 @@ export default function App() {
       }
     }
     setEdges([...birth, ...ghostEdges, ...merged]);
-  }, [tree, proposals, layout, noteText, noteRemove, adoptGhost, setNodes]);
+  }, [tree, proposals, layout, noteText, noteRemove, adoptGhost, scaleNode, setNodes, setViewport, fitView]);
 
   // 拖完，位置归档（保留尺度）——这是画布唯一"写"的东西之一。
   const onDragStop: OnNodeDrag<CanvasNode> = useCallback((_e, node) => {
@@ -358,10 +425,14 @@ export default function App() {
           onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDoubleClick}
           onPaneClick={() => setSelectedId(null)}
+          onMoveEnd={(_e, vp) => {
+            if (layoutRef.current === null || !initialViewDone.current) return;
+            layoutRef.current = { ...layoutRef.current, viewport: vp };
+            scheduleSave();
+          }}
           zoomOnDoubleClick={false}
           zoomOnScroll={false}
           panOnScroll={false}
-          fitView
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
           proOptions={{ hideAttribution: true }}

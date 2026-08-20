@@ -46,10 +46,21 @@ header {
 
 /* 镜像节点：意图。全部尺寸用 em——字号即尺度，缩放层面创建的大小跟着 s 走 */
 .intent-node {
+  position: relative;
   min-width: 12em; max-width: 18.5em; padding: .7em .85em .55em;
   background: var(--panel); border: .11em solid var(--open); border-radius: .7em;
   box-shadow: 0 .15em .7em rgba(0,0,0,.35);
 }
+
+/* 右下角柄：拖动调大小（s 是布局的一部分） */
+.resize-grip {
+  position: absolute; right: .14em; bottom: .14em; width: .8em; height: .8em;
+  cursor: nwse-resize; opacity: 0;
+  border-right: .16em solid var(--dim); border-bottom: .16em solid var(--dim);
+  border-bottom-right-radius: .3em;
+}
+.intent-node:hover .resize-grip, .ghost-node:hover .resize-grip, .note-node:hover .resize-grip { opacity: .85; }
+.resize-grip:hover { border-color: var(--accent); }
 .intent-node .saying { line-height: 1.55; }
 .intent-node .meta { display: flex; gap: .45em; margin-top: .45em; min-height: 1em; }
 .intent-node .meta span {
@@ -67,7 +78,8 @@ header {
 
 /* 幽灵节点：agent 提的，认了才上树 */
 .ghost-node {
-  min-width: 12em; max-width: 18.5em; padding: .6em .85em .55em; position: relative;
+  position: relative;
+  min-width: 12em; max-width: 18.5em; padding: .6em .85em .55em;
   background: rgba(31,33,38,.55); border: .1em dashed #565a63; border-radius: .7em;
   color: var(--dim);
 }
