@@ -3,17 +3,26 @@ import {
   MarkerType, type Edge, type NodeMouseHandler, type OnNodeDrag,
 } from '@xyflow/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { act, fetchLayout, fetchTree, onChange, saveLayout } from './api';
-import type { Layout, TreeData, TreeNode } from './api';
-import { autoPlace } from './layout';
-import { IntentNodeView, NoteNodeView, type IntentFlowNode, type NoteFlowNode } from './nodes';
+import { act, fetchLayout, fetchProposals, fetchTree, onChange, saveLayout } from './api';
+import type { Layout, Proposal, TreeData, TreeNode } from './api';
+import { autoPlace, type Placeable } from './layout';
+import {
+  GhostNodeView, IntentNodeView, NoteNodeView,
+  type GhostFlowNode, type IntentFlowNode, type NoteFlowNode,
+} from './nodes';
 
-type CanvasNode = IntentFlowNode | NoteFlowNode;
+type CanvasNode = IntentFlowNode | GhostFlowNode | NoteFlowNode;
 
-const nodeTypes = { intent: IntentNodeView, note: NoteNodeView };
+const nodeTypes = { intent: IntentNodeView, ghost: GhostNodeView, note: NoteNodeView };
+
+const isSuspended = (t: string): boolean => / ⏸$/u.test(t);
+const cleanText = (t: string): string => t.replace(/ ⏸$/u, '');
+/** 创建时的世界尺度 = 1/当时的缩放，夹在可读范围里。 */
+const clampScale = (v: number): number => Math.min(10, Math.max(0.35, v));
 
 export default function App() {
   const [tree, setTree] = useState<TreeData | null>(null);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
   const [layout, setLayout] = useState<Layout | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -22,29 +31,34 @@ export default function App() {
   const [whyText, setWhyText] = useState('');
   const [err, setErr] = useState('');
   const dirty = useRef(false);
-  const { screenToFlowPosition } = useReactFlow();
+  /** 本次渲染里每个东西实际落在哪（含自动摆位的），认领实体化时按这个原位落地。 */
+  const posRef = useRef<Record<string, { x: number; y: number; s: number }>>({});
+  const { screenToFlowPosition, getViewport } = useReactFlow();
 
   const oops = (e: unknown) => {
     setErr(e instanceof Error ? e.message : String(e));
     setTimeout(() => setErr(''), 5000);
   };
 
-  const reloadTree = useCallback(async () => {
-    try { setTree(await fetchTree()); } catch (e) { oops(e); }
+  const reload = useCallback(async () => {
+    try {
+      const [t, p] = await Promise.all([fetchTree(), fetchProposals()]);
+      setTree(t); setProposals(p);
+    } catch (e) { oops(e); }
   }, []);
 
-  // 开场：取树、取布局，然后听着——服务端喊"变了"就再取一次树。
+  // 开场：树、提议、布局；然后听着——服务端喊"变了"就再取。
   useEffect(() => {
     void (async () => {
       try {
-        const [t, l] = await Promise.all([fetchTree(), fetchLayout()]);
-        setTree(t); setLayout(l);
+        const [t, p, l] = await Promise.all([fetchTree(), fetchProposals(), fetchLayout()]);
+        setTree(t); setProposals(p); setLayout(l);
       } catch (e) { oops(e); }
     })();
-    return onChange(() => { void reloadTree(); });
-  }, [reloadTree]);
+    return onChange(() => { void reload(); });
+  }, [reload]);
 
-  // 布局归人：改了就存（略作合并），存的只有位置和便签。
+  // 布局归人：改了就存，存的只有位置、尺度和便签。
   useEffect(() => {
     if (layout === null || !dirty.current) return;
     const t = setTimeout(() => { dirty.current = false; saveLayout(layout).catch(oops); }, 400);
@@ -63,30 +77,94 @@ export default function App() {
     mutateLayout((l) => ({ ...l, notes: l.notes.filter((n) => n.id !== id) }));
   }, [mutateLayout]);
 
-  // 树（镜像）+ 便签（原生）→ 画布上的节点。位置：人摆过的用人摆的，没摆过的给个初始值。
+  /** 幽灵实体化：认领=一句真话过人的门；有已认领的祖先就先"回到"它名下再认。 */
+  const adoptGhost = useCallback(async (pid: string) => {
+    if (tree === null) return;
+    const byId = new Map(proposals.map((x) => [x.id, x]));
+    const p = byId.get(pid);
+    if (p === undefined) return;
+    const adoptedByProposal = new Map(
+      tree.nodes.filter((n) => n.fromProposal !== null).map((n) => [n.fromProposal as string, n.id]),
+    );
+    let under: string | undefined;
+    for (let q = p.parent; q !== null; q = byId.get(q)?.parent ?? null) {
+      const hit = adoptedByProposal.get(q);
+      if (hit !== undefined) { under = hit; break; }
+    }
+    const pos = posRef.current[pid] ?? { x: 0, y: 0, s: 1 };
+    try {
+      const { id: newId } = await act('adopt', {
+        text: cleanText(p.text), accepting: pid, ...(under !== undefined ? { under } : {}),
+      });
+      mutateLayout((l) => ({
+        ...l,
+        positions: { ...l.positions, [newId]: { x: pos.x, y: pos.y, ...(pos.s !== 1 ? { s: pos.s } : {}) } },
+      }));
+      await reload();
+    } catch (e) { oops(e); }
+  }, [tree, proposals, mutateLayout, reload]);
+
+  // 树（镜像）+ 提议（幽灵）+ 便签（原生）→ 画布。位置：人摆过的用人摆的，没摆过的给初始值。
   useEffect(() => {
     if (tree === null || layout === null) return;
-    const auto = autoPlace(tree.nodes, layout.positions);
-    const at = (id: string) => layout.positions[id] ?? auto[id] ?? { x: 0, y: 0 };
-    const intentNodes: CanvasNode[] = tree.nodes.map((n) => ({
-      id: n.id, type: 'intent' as const, position: at(n.id),
-      data: {
-        saying: n.saying, status: n.status, isCurrent: tree.current === n.id,
-        mergedCount: n.mergedWith.length, bornText: n.bornOf?.text ?? '',
-      },
-    }));
+    const adoptedByProposal = new Map(
+      tree.nodes.filter((n) => n.fromProposal !== null).map((n) => [n.fromProposal as string, n.id]),
+    );
+    const union: Placeable[] = [
+      ...tree.nodes.map((n) => ({ id: n.id, parent: n.parent })),
+      ...proposals.map((p) => ({
+        id: p.id,
+        parent: p.parent !== null ? (adoptedByProposal.get(p.parent) ?? p.parent) : null,
+      })),
+    ];
+    const auto = autoPlace(union, layout.positions);
+    const at = (id: string): { x: number; y: number; s: number } => {
+      const stored = layout.positions[id];
+      const base = stored ?? auto[id] ?? { x: 0, y: 0 };
+      return { x: base.x, y: base.y, s: stored?.s ?? 1 };
+    };
+    const pmap: Record<string, { x: number; y: number; s: number }> = {};
+    for (const u of union) pmap[u.id] = at(u.id);
+    posRef.current = pmap;
+
+    const intentNodes: CanvasNode[] = tree.nodes.map((n) => {
+      const p = at(n.id);
+      return {
+        id: n.id, type: 'intent' as const, position: { x: p.x, y: p.y },
+        data: {
+          saying: n.saying, status: n.status, isCurrent: tree.current === n.id,
+          mergedCount: n.mergedWith.length, bornText: n.bornOf?.text ?? '', s: p.s,
+        },
+      };
+    });
+    const ghostNodes: CanvasNode[] = proposals.map((g) => {
+      const p = at(g.id);
+      return {
+        id: g.id, type: 'ghost' as const, position: { x: p.x, y: p.y },
+        data: { text: cleanText(g.text), suspended: isSuspended(g.text), s: p.s, onAdopt: adoptGhost },
+      };
+    });
     const noteNodes: CanvasNode[] = layout.notes.map((nt) => ({
       id: nt.id, type: 'note' as const, position: { x: nt.x, y: nt.y },
-      data: { text: nt.text, onText: noteText, onRemove: noteRemove },
+      data: { text: nt.text, s: nt.s ?? 1, onText: noteText, onRemove: noteRemove },
     }));
-    setNodes([...intentNodes, ...noteNodes]);
+    setNodes([...intentNodes, ...ghostNodes, ...noteNodes]);
 
+    const known = new Set(union.map((u) => u.id));
     const birth: Edge[] = tree.nodes
       .filter((n) => n.parent !== null)
       .map((n) => ({
         id: `b-${n.id}`, source: n.parent as string, target: n.id,
         markerEnd: { type: MarkerType.ArrowClosed }, style: { strokeWidth: 1.6 },
       }));
+    const ghostEdges: Edge[] = proposals
+      .map((g): Edge | null => {
+        const src = g.parent !== null ? (adoptedByProposal.get(g.parent) ?? g.parent) : null;
+        return src !== null && known.has(src)
+          ? { id: `g-${g.id}`, source: src, target: g.id, style: { strokeDasharray: '4 5', opacity: 0.45 } }
+          : null;
+      })
+      .filter((e): e is Edge => e !== null);
     const seen = new Set<string>();
     const merged: Edge[] = [];
     for (const n of tree.nodes) {
@@ -100,18 +178,30 @@ export default function App() {
         });
       }
     }
-    setEdges([...birth, ...merged]);
-  }, [tree, layout, noteText, noteRemove, setNodes]);
+    setEdges([...birth, ...ghostEdges, ...merged]);
+  }, [tree, proposals, layout, noteText, noteRemove, adoptGhost, setNodes]);
 
-  // 拖完，位置归档——这是画布唯一"写"的东西之一。
+  // 拖完，位置归档（保留尺度）——这是画布唯一"写"的东西之一。
   const onDragStop: OnNodeDrag<CanvasNode> = useCallback((_e, node) => {
-    if (node.type === 'intent') {
-      mutateLayout((l) => ({ ...l, positions: { ...l.positions, [node.id]: node.position } }));
-    } else {
+    if (node.type === 'note') {
       mutateLayout((l) => ({
         ...l,
         notes: l.notes.map((n) => (n.id === node.id ? { ...n, x: node.position.x, y: node.position.y } : n)),
       }));
+    } else {
+      mutateLayout((l) => {
+        const prev = l.positions[node.id];
+        return {
+          ...l,
+          positions: {
+            ...l.positions,
+            [node.id]: {
+              x: node.position.x, y: node.position.y,
+              ...(prev?.s !== undefined ? { s: prev.s } : {}),
+            },
+          },
+        };
+      });
     }
   }, [mutateLayout]);
 
@@ -122,16 +212,31 @@ export default function App() {
 
   const addNoteAt = useCallback((x: number, y: number) => {
     const p = screenToFlowPosition({ x, y });
+    const s = clampScale(1 / getViewport().zoom);
     mutateLayout((l) => ({
       ...l,
-      notes: [...l.notes, { id: crypto.randomUUID(), x: p.x, y: p.y, text: '' }],
+      notes: [...l.notes, { id: crypto.randomUUID(), x: p.x, y: p.y, s, text: '' }],
     }));
-  }, [mutateLayout, screenToFlowPosition]);
+  }, [mutateLayout, screenToFlowPosition, getViewport]);
 
-  const doAct = async (kind: 'adopt' | 'resume' | 'done' | 'drop', params: { text?: string; target?: string; why?: string }) => {
+  /** 顶栏认领：落在视野中心，尺度=当下的缩放层面。 */
+  const adoptHere = useCallback(async (text: string) => {
+    const s = clampScale(1 / getViewport().zoom);
+    const c = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight * 0.45 });
+    try {
+      const { id } = await act('adopt', { text });
+      mutateLayout((l) => ({
+        ...l,
+        positions: { ...l.positions, [id]: { x: c.x, y: c.y, ...(s !== 1 ? { s } : {}) } },
+      }));
+      await reload();
+    } catch (e) { oops(e); }
+  }, [getViewport, screenToFlowPosition, mutateLayout, reload]);
+
+  const doAct = async (kind: 'resume' | 'done' | 'drop', params: { target?: string; why?: string }) => {
     try {
       await act(kind, params);
-      await reloadTree();
+      await reload();
     } catch (e) { oops(e); }
   };
 
@@ -144,17 +249,20 @@ export default function App() {
       <header>
         <span className="brand">Theseus · 画布</span>
         <span className="line" title="从当前沿出生边走到根">{tree?.line ?? '…'}</span>
+        <span className="ghost-count dim">
+          {proposals.length > 0 ? `幽灵 ${proposals.length} 条待认领` : ''}
+        </span>
         <form className="say" onSubmit={(e) => {
           e.preventDefault();
           const text = sayText.trim();
           if (text === '') return;
           setSayText('');
-          void doAct('adopt', { text });
+          void adoptHere(text);
         }}>
           <input
             value={sayText}
             onChange={(e) => setSayText(e.target.value)}
-            placeholder="说一句，认领一条意图（挂在当前之下）…"
+            placeholder="说一句，认领一条意图（挂在当前之下，落在视野中心）…"
           />
           <button type="submit">认领</button>
         </form>
@@ -171,15 +279,17 @@ export default function App() {
           onPaneClick={() => setSelectedId(null)}
           zoomOnDoubleClick={false}
           fitView
-          minZoom={0.1}
+          minZoom={0.05}
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={24} />
           <Controls />
-          <MiniMap pannable zoomable nodeColor={(n) => (n.type === 'note' ? '#d9c26a' : '#7a9ec9')} />
+          <MiniMap pannable zoomable nodeColor={(n) =>
+            n.type === 'note' ? '#d9c26a' : n.type === 'ghost' ? '#565a63' : '#7a9ec9'
+          } />
         </ReactFlow>
 
-        {tree !== null && tree.nodes.length === 0 && (
+        {tree !== null && tree.nodes.length === 0 && proposals.length === 0 && (
           <div className="empty">
             <p>树还是空的。</p>
             <p>在上面说一句——比如「把画布做出来」——认领你的第一条意图。</p>

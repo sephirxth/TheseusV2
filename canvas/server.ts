@@ -40,9 +40,11 @@ class LayoutRefused extends Error {
 
 // ─────────────────────────────── 布局：只有位置、便签、视口 ───────────────────────────────
 
-interface Note { id: string; x: number; y: number; w?: number; h?: number; text: string }
+// `s` 是创建时的缩放尺度（世界尺寸倍率）：缩得远建的东西大，凑近建的小——
+// 大小本身是人赋予的语义（2021 年那句"字号表意，但我不想知道字号是多少"）。
+interface Note { id: string; x: number; y: number; w?: number; h?: number; s?: number; text: string }
 interface Layout {
-  positions: Record<string, { x: number; y: number }>;
+  positions: Record<string, { x: number; y: number; s?: number }>;
   notes: Note[];
   viewport?: { x: number; y: number; zoom: number };
 }
@@ -77,9 +79,10 @@ function checkLayout(raw: unknown): Layout {
     if (typeof p !== 'object' || p === null || Array.isArray(p)) throw new LayoutRefused('positions 必须是对象');
     for (const [id, pos] of Object.entries(p)) {
       if (typeof pos !== 'object' || pos === null) throw new LayoutRefused(`positions['${id}'] 必须是对象`);
-      onlyKeys(pos, ['x', 'y'], `positions['${id}']`);
+      onlyKeys(pos, ['x', 'y', 's'], `positions['${id}']`);
       const q = pos as Record<string, unknown>;
       positions[id] = { x: aNumber(q['x'], `positions['${id}'].x`), y: aNumber(q['y'], `positions['${id}'].y`) };
+      if (q['s'] !== undefined) positions[id].s = aNumber(q['s'], `positions['${id}'].s`);
     }
   }
 
@@ -88,7 +91,7 @@ function checkLayout(raw: unknown): Layout {
     if (!Array.isArray(r['notes'])) throw new LayoutRefused('notes 必须是数组');
     for (const [i, n] of (r['notes'] as unknown[]).entries()) {
       if (typeof n !== 'object' || n === null) throw new LayoutRefused(`notes[${i}] 必须是对象`);
-      onlyKeys(n, ['id', 'x', 'y', 'w', 'h', 'text'], `notes[${i}]`);
+      onlyKeys(n, ['id', 'x', 'y', 'w', 'h', 's', 'text'], `notes[${i}]`);
       const q = n as Record<string, unknown>;
       const note: Note = {
         id: aString(q['id'], `notes[${i}].id`),
@@ -98,6 +101,7 @@ function checkLayout(raw: unknown): Layout {
       };
       if (q['w'] !== undefined) note.w = aNumber(q['w'], `notes[${i}].w`);
       if (q['h'] !== undefined) note.h = aNumber(q['h'], `notes[${i}].h`);
+      if (q['s'] !== undefined) note.s = aNumber(q['s'], `notes[${i}].s`);
       notes.push(note);
     }
   }
@@ -134,6 +138,8 @@ interface TreeNodeOut {
   id: string; saying: string; parent: string | null;
   status: 'open' | 'done' | 'dropped'; mergedWith: readonly string[]; lastTouched: string;
   bornOf: { id: string; text: string; ts: string } | null;
+  /** 认下的是哪条提议（幽灵实体化之后，前端靠它接上幽灵树的边）。 */
+  fromProposal: string | null;
 }
 
 function treeJson(): { current: string | null; line: string; nodes: TreeNodeOut[] } {
@@ -145,9 +151,24 @@ function treeJson(): { current: string | null; line: string; nodes: TreeNodeOut[
       id: n.id, saying: n.saying, parent: n.parent, status: n.status,
       mergedWith: n.mergedWith, lastTouched: n.lastTouched,
       bornOf: h === null ? null : { id: h.id, text: String(h.payload['text'] ?? ''), ts: h.ts },
+      fromProposal: born?.basis[0] ?? null,
     };
   });
   return { current: t.current, line: intent.line(), nodes };
+}
+
+/**
+ * 还没被回应的提议（agent 提的、树上不算数的那些）。前端把它们画成幽灵树。
+ * "被回应"只认树的动词——提议之间的引用（父子）不算回应。
+ */
+function proposalsJson(): { id: string; text: string; ts: string; parent: string | null }[] {
+  return trace.ofType('intent.proposed')
+    .filter((p) => !trace.became(p.id).some(
+      (s) => s.type.startsWith('intent.') && s.type !== 'intent.proposed',
+    ))
+    .map((p) => ({
+      id: p.id, text: String(p.payload['text'] ?? ''), ts: p.ts, parent: p.basis[0] ?? null,
+    }));
 }
 
 // ─────────────────────────────── 动作：面板是人的门 ───────────────────────────────
@@ -168,7 +189,15 @@ function act(b: Record<string, unknown>): { id: string } {
   if (kind === 'adopt') {
     const text = String(b['text'] ?? '').trim();
     if (text === '') throw new IntentRefused('一个节点是一句话——空的说法长不成节点');
-    return { id: intent.adopt({ said: say(text).id, text }).id };
+    const accepting = typeof b['accepting'] === 'string' ? b['accepting'] : undefined;
+    const under = typeof b['under'] === 'string' ? b['under'] : undefined;
+    // 认在指定的老节点下：同一句话既是"回去"的授权也是"认领"的授权——
+    // 两条痕迹都直接挂在它上面，判据一条不松（design/intent.md 1.4：要挂到老节点上，先回去）。
+    const h = say(under !== undefined && under !== intent.tree().current ? `回到「${sayingOf(under)}」，认领：${text}` : text);
+    if (under !== undefined && under !== intent.tree().current) {
+      intent.resume({ said: h.id, node: under });
+    }
+    return { id: intent.adopt({ said: h.id, text, ...(accepting !== undefined ? { accepting } : {}) }).id };
   }
   if (kind === 'resume') {
     return { id: intent.resume({ said: say(`回到：${sayingOf(target)}`).id, node: target }).id };
@@ -189,7 +218,10 @@ function act(b: Record<string, unknown>): { id: string } {
 const listeners = new Set<ServerResponse>();
 let lastHash = '';
 setInterval(() => {
-  const hash = createHash('sha256').update(JSON.stringify(treeJson())).digest('hex');
+  const hash = createHash('sha256')
+    .update(JSON.stringify(treeJson()))
+    .update(JSON.stringify(proposalsJson()))
+    .digest('hex');
   if (hash === lastHash) return;
   lastHash = hash;
   for (const res of listeners) res.write('data: changed\n\n');
@@ -244,6 +276,7 @@ createServer(async (req, res) => {
   try {
     if (url.pathname === '/healthz') return json(res, 200, { ok: true, db: DB });
     if (url.pathname === '/api/tree' && req.method === 'GET') return json(res, 200, treeJson());
+    if (url.pathname === '/api/proposals' && req.method === 'GET') return json(res, 200, proposalsJson());
     if (url.pathname === '/api/layout' && req.method === 'GET') return json(res, 200, await readLayout());
     if (url.pathname === '/api/layout' && req.method === 'PUT') {
       await writeLayout(checkLayout(await body(req)));

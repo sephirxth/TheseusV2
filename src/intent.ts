@@ -75,6 +75,8 @@ export interface Propose {
   readonly origin?: Origin;
   /** 这个猜测凭什么（可选）。 */
   readonly about?: readonly string[];
+  /** 幂等键（可选）：同一条提议重复提，不重复记。规矩同痕迹本身。 */
+  readonly idem?: string;
 }
 export interface Adopt {
   /** 人那句话的痕迹号。做数的是它，不是写痕迹的 agent。 */
@@ -126,6 +128,7 @@ export class Intent {
       ...(o.cause !== undefined ? { cause: o.cause } : {}),
       ...(o.origin !== undefined ? { origin: o.origin } : {}),
       ...(o.about !== undefined && o.about.length > 0 ? { basis: o.about } : {}),
+      ...(o.idem !== undefined ? { idem: o.idem } : {}),
       payload: { text: o.text },
     });
   }
