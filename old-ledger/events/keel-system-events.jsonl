@@ -1,0 +1,12 @@
+{"ts":"2026-04-10T14:15:29Z","component":"test","level":"error","msg":"smoke test from shell","detail":"detail=verification"}
+{"ts":"2026-04-10T14:15:38Z","component":"test","level":"error","msg":"smoke test from shell","detail":"detail=verification"}
+{"ts": "2026-04-10T14:17:22Z", "component": "c0-heartbeat", "level": "warn", "msg": "check failed: keel_logs"}
+{"ts": "2026-04-10T14:17:22Z", "component": "c0-heartbeat", "level": "error", "msg": "procedure failed to recover check=keel_logs"}
+{"ts": "2026-04-10T14:17:22Z", "component": "c0-heartbeat", "level": "warn", "msg": "check failed: keel_state_reports"}
+{"ts": "2026-04-10T14:17:22Z", "component": "c0-heartbeat", "level": "error", "msg": "procedure failed to recover check=keel_state_reports"}
+{"ts": "2026-04-10T14:17:32.730384+00:00", "component": "test-python", "level": "warn", "msg": "acceptance test", "detail": "detail=v1"}
+{"ts": "2026-04-10T14:17:32Z", "component": "test-shell", "level": "error", "msg": "acceptance test", "detail": "detail=v1"}
+{"ts":"2026-04-10T14:15:29Z","component":"test","level":"error","msg":"smoke test from shell","detail":"detail=verification"}
+{"ts":"2026-04-10T14:15:38Z","component":"test","level":"error","msg":"smoke test from shell","detail":"detail=verification"}
+{"ts": "2026-04-15T12:28:28.148516+00:00", "component": "test", "level": "info", "msg": "logs unified into L1", "detail": "detail=migration-complete"}
+{"ts": "2026-04-15T12:37:17.673382+00:00", "component": "test", "level": "info", "msg": "core/log_emit smoke test"}
