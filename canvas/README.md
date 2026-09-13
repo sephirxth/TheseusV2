@@ -1,45 +1,48 @@
-# 画布（canvas）v0.1
+# Canvas (v0.1)
 
-第二入口。直接迭代，不走用例流水线（2026-08-20 游渊定）——但罗盘仍是
-[`docs/requirements/canvas.md`](../docs/requirements/canvas.md) 的 U30–U34。
+The second entrance. Iterated directly, skipping the use-case pipeline (decided 2026-08-20) — but the compass remains U30–U34 of [`docs/requirements/canvas.md`](../docs/requirements/canvas.md).
 
-## 架构（选型标准：经得起持续改）
+## Architecture (selection criterion: survives continuous change)
 
-- **前端**：React + [`@xyflow/react`](https://reactflow.dev)（MIT）+ Vite。
-  节点即组件：`nodes.tsx` 里的组件表就是类型注册表——每加一类对象
-  （agent 卡、审阅项、Operator Brief）只是加一行，不动骨架。
-  拖拽、框选、缩放、小地图开箱即有；构建产物全本地，零 CDN。
-- **服务端**：`server.ts`，Node 内建 http，零框架，直接复用 `src/trace.ts` /
-  `src/intent.ts` / `src/doors.ts`。**树永远现场折叠，不另存**。
-- **两种本体，两条存放路**：
-  - 镜像（意图树、状态）：真相在痕迹库里，画布只读；
-  - 原生（位置、便签、视口）：存 `canvas-layout.json`。
-    **布局这道门递归核对字段，运行真相一个都进不来**（维度透镜的教训）。
-- **面板是人的门**（design/intent.md 2.3）：点按钮=开口，落一条
-  `canvas.said`（`user:human:canvas`），意图痕迹由 `tool:canvas` 走 agent 的门挂上去。
-  判据原样生效，画布上不再造一道。
+- **Frontend**: React + [`@xyflow/react`](https://reactflow.dev) (MIT) + Vite.
+  Nodes are components: the component table in `nodes.tsx` is the type registry — adding a new
+  object kind (agent card, review item, operator brief) is one more line, no skeleton surgery.
+  Drag, box-select, zoom, minimap out of the box; build artifacts fully local, zero CDN.
+- **Server**: `server.ts`, Node built-in http, zero frameworks, directly reusing `src/trace.ts` /
+  `src/intent.ts` / `src/doors.ts`. **The tree is always folded on demand, never stored twice.**
+- **Two ontologies, two storage paths:**
+  - Mirrors (intent tree, status): truth lives in the trace store; the canvas only reads;
+  - Natives (positions, notes, viewport): stored in `canvas-layout.json`.
+  **The layout gate recursively validates fields — no runtime-truth field can enter** (the dimension-lens lesson).
+- **The panel is a human gate** (design/intent.md 2.3): a button click is an utterance, recorded
+  as `canvas.said` (`user:human:canvas`); intent traces attach via `tool:canvas` through the agent gate.
+  Criteria apply as-is; no second gate invented on the canvas.
 
-## 跑
+## Run
 
-```bash
-pnpm install               # 仓库根目录（pnpm workspace）
-pnpm -C canvas build       # 前端 → canvas/dist
-node canvas/server.ts      # 127.0.0.1:8811，服务 API + dist
-pnpm -C canvas dev         # 开发：vite 热更，/api 代理到 8811
+```sh
+pnpm install               # repo root (pnpm workspace)
+pnpm -C canvas build       # frontend -> canvas/dist
+node canvas/server.ts      # 127.0.0.1:8811, serves API + dist
+pnpm -C canvas dev         # dev: vite HMR, /api proxied to 8811
 ```
 
-环境变量：`THESEUS_TRACE_DB`（默认 `~/.local/state/theseus/trace.db`）、
-`THESEUS_CANVAS_LAYOUT`（默认同目录 `canvas-layout.json`）、`THESEUS_CANVAS_PORT`（默认 8811）。
+Environment variables: `THESEUS_TRACE_DB` (default `~/.local/state/theseus/trace.db`),
+`THESEUS_CANVAS_LAYOUT` (default `canvas-layout.json` in the same directory), `THESEUS_CANVAS_PORT` (default 8811).
 
-## v0.1 已有的
+## What v0.1 has
 
-认领（挂在当前之下）、回到这儿、做完了、不做了（要理由）；出生边实线、融合边虚线；
-"当前"高亮；位置拖动即归档；双击空白贴便签；右侧详情露出"出生的那句话"；
-SSE：账一变，所有打开的画布跟着变。
+Claim (child of current), resume here, mark done, drop (requires a reason); birth edges solid,
+merge edges dashed; current-node highlight; drag archives position; double-click empty space
+pins a note; the right-side detail reveals the birth utterance; SSE: when the ledger changes,
+every open canvas follows.
 
-## 迭代挂点（往哪儿改）
+## Extension points (where to change next)
 
-- 新对象类型 → `nodes.tsx` 加组件 + `App.tsx` 的 `nodeTypes` 注册。
-- 新动作 → `server.ts` 的 `act()` 加一个分支（人的门 + 意图痕迹的组合不变）。
-- 悬着的名单 / 谁在等我（桥 U27/U29 的桌面形态）→ 服务端已有 `intent.dangling()` 可用。
-- 构面 / 聚焦（U33）→ 前端过滤 + 淡出，布局里可存构面定义（新增字段同样要过布局那道门的核对）。
+- New object type -> add a component in `nodes.tsx` + register in `App.tsx` `nodeTypes`.
+- New action -> one more branch in `act()` in `server.ts` (the human-gate + intent-trace
+  combination never changes).
+- Dangling list / who-is-waiting-on-me (desktop form of bridge U27/U29) -> server already has
+  `intent.dangling()`.
+- Faceting / focus (U33) -> frontend filter + fade-out; facet definitions can live in layout
+  (new fields must pass the layout gate's validation too).

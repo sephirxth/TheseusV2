@@ -1,4 +1,4 @@
-# ==== 私密层: 绝不入公开仓 ====
+# ==== private layers: never in the public tree ====
 1.human_expressions/
 2.references/
 3.requirements/
@@ -13,10 +13,10 @@ build/
 *.local
 .env*
 
-# ==== 画布本地态 ====
+# ==== canvas local state ====
 canvas/server.ts
 
-# ==== 其他 ====
+# ==== misc ====
 *.log
 .DS_Store
 canvas/web/dist/
@@ -24,3 +24,9 @@ canvas/web/node_modules/
 runs/
 .edit.lock
 old-ledger/
+docs/design/
+docs/requirements/
+docs/acceptance/
+docs/TODO.md
+docs/2026*.html
+docs-site/

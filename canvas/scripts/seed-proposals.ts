@@ -1,7 +1,7 @@
 /**
- * 把旧系统意图树（L2 投影 tree.md）里还活着的节点，作为**提议**种进痕迹。
+ * Seed still-living nodes of the old system's intent tree (L2 projection tree.md) into traces as **proposals**.
  *
- * 为什么是提议而不是节点：树上只有我认的（U19-6），agent 造不出"人说的话"。
+ * Why proposals and not nodes: only what I accept gets on the tree (U19-6); an agent cannot fabricate a human utterance.
  * 旧树的节点是真的，但"我现在还要不要它"只有人说了算——所以它们以
  * `intent.proposed` 进来（agent 随便提，一条也不长树），在画布上显示为幽灵，
  * 人点一下"认领"，那一下才是授权。
