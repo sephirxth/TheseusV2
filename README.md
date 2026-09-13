@@ -1,171 +1,89 @@
-<p align="center">
-  <img src="docs/assets/banner.png" alt="The ship of Theseus, rebuilt plank by plank while sailing; its wake rises into a constellation tree" width="100%">
-</p>
+# TheseusV2
 
-<h1 align="center">Theseus V2</h1>
+> **Systems that improve how they improve** — a human-in-the-loop, process-level self-evolving workspace.
 
-<p align="center">
-  A personal AI operating system, rebuilt top-down: declarative process lifecycle, an append-only causal trace, and an intent tree derived from what actually happened.
-</p>
+TheseusV2 (忒修斯之船二号) is a personal cognitive-infrastructure system: an infinite canvas bound to a real intent DAG, where **state is never stored — it can only be *folded* from append-only traces**, and where every mutation of "what the system believes" passes a human gate.
 
-<p align="center">
-  <a href="LICENSE"><img alt="License: PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue"></a>
-  <img alt="Node >= 22.18" src="https://img.shields.io/badge/node-%3E%3D%2022.18-brightgreen">
-  <img alt="Runtime dependencies: 0" src="https://img.shields.io/badge/runtime%20deps-0-orange">
-  <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178c6">
-</p>
+**Key design tenets:**
 
-<p align="center">
-  English | <a href="README.zh-CN.md">中文</a>
-</p>
+- **Fold, don't store.** Current state is a deterministic function of an append-only trace log — like a bank balance derived from transactions, never recorded separately. The history is the only truth; stored state cannot contradict it.
+- **HumanDoor.** Claims about the owner's intent are only valid if folded from the owner's own recorded words. Agent-written "beliefs" never enter the owner's state. This is a structural defense against agent hallucination — not a prompting defense.
+- **Intent DAG, not chat history.** Intentions form a directed-acyclic graph with multiple predecessors converging (no tree-shaped lie), driven forward causally. The canvas is a projection of that DAG, not a document.
+- **Process-level RSI, human-in-the-loop.** The system's purpose since inception is *self-evolution with its owner* — improving its own briefs, gates, metrics and procedures (external traces, not model weights), with the human as the acceptance gate and the bottleneck-to-amplify. It is deliberately not autonomous RSI.
+- **Six-layer verification lineage.** Positive cases / negative cases / mutation self-checks / metamorphic tests / perturbation robustness / epistemic anti-forgery (proposals lock, machines may never mark their own work as aligned).
 
 ---
 
-Like the ship of Theseus, this system is designed to be rebuilt plank by plank while it sails: parts get replaced, corrected, and grown at runtime, while three questions stay answerable at any moment — **what am I pursuing, what happened, and why**.
+## Evolution History
 
-> **Note:** the requirements, design, and acceptance documents under `docs/` are written in Chinese, the working language of this project. This README is the English entry point.
+### Prologue — "Loop" and moon (2026-02)
 
-## Features
+The lineage begins before the name. On **2026-02-25**, a repo called *Loop* was initialized — "人机协作系统" (a human-AI collaboration system), with a Telegram bot as the mobile capture surface for fleeting thoughts. It was renamed **moon** within weeks (`feat(月)`, then `feat(moon): direct channel core and c0 self-repair`, 2026-03-14 — already doing self-repair). In April 2026, the pre-restructure moon was archived intact (`.archive/moon-pre-restructure-20260418/`), preserving the origin point of the entire lineage.
 
-- **Declarative lifecycle on systemd** — `parts.ts` is the single source of truth. Unit files are derived from it byte-for-byte; `up` / `down` / `status` are idempotent; drift is reported in both directions (installed but undeclared, declared but missing). Dependency cycles and dangling references are rejected with the full chain named.
-- **Honest state reporting** — each of systemd's six `ActiveState` values has an explicit translation (`activating` is *starting*, never *running*). Unrecognized states surface with the raw word instead of falling into a default, and "unit not installed" is its own state rather than *stopped*.
-- **Append-only causal trace on SQLite** — every step records who did it (`namespace:type:session`), what caused it, or which of three recognized origins it came from (`you-said` / `clock-fired` / `arrived-from-outside`). IDs are monotonic ULIDs, so a single `CHECK (cause < id)` makes causal cycles structurally impossible.
-- **Decisions carry their grounds** — `decision.*` and `self.*` records are refused without a `basis`; conclusions resting entirely on routine bookkeeping are refused as well.
-- **Compaction that downsamples, never deletes** — old routine records fold into daily counts; anything referenced by a cause or basis stays put, and causal chains replay intact afterwards.
-- **An intent tree that is a query, not a table** — the tree is folded out of the trace on every read; there is no second store to drift. Only intents backed by a direct human utterance become nodes; agent proposals never do. Corrections replace a node's current wording while the original stays in place, retrievable later as (guess, fix) pairs.
-- **Two doors** — human-facing entry points may write human-attributed records; the agent-facing door refuses them outright, so the authority criterion cannot be forged from the reachable surface.
-- **Mutation-locked test suite** — a harness deliberately breaks each load-bearing property and verifies its test goes red. A test that stays green under mutation is reported as decoration.
-- **Zero runtime dependencies** — Node's built-in `node:sqlite`, systemd, and TypeScript executed directly by Node. The only packages are `typescript` and `@types/node`, both dev-only.
+### Origins — Theseus V1 ("keel", 2026-03)
 
-## Architecture
-
-```mermaid
-flowchart LR
-  subgraph Lifecycle
-    D["parts.ts<br/>(the declaration)"] -->|"theseus up<br/>byte-for-byte"| U["systemd user units"]
-    U --> P["part processes"]
-  end
-  subgraph Trace
-    P -->|"stdout (systemd append)"| L["log files"]
-    L -->|"absorb: intercepted<br/>from the side"| T[("trace<br/>SQLite, append-only")]
-    H["human utterances<br/>(human door)"] --> T
-    A2["agent actions<br/>(agent door)"] --> T
-  end
-  subgraph Intent
-    T -->|"fold: only adopted<br/>intents become nodes"| I["what am I pursuing,<br/>and where it came from"]
-  end
-  I -.->|"the loop (planned):<br/>act on what happened,<br/>ask about anything irreversible"| A2
-```
-
-## Project status
-
-| Module | Scope | Use cases | Status |
-|---|---|---|---|
-| **Lifecycle** | Process start/stop, honest state, two-way drift reconciliation | U1–U6 | ✅ Implemented + accepted |
-| **Trace** | Causal chains, three origins, decisions with grounds | U7–U14 | ✅ Implemented + accepted (migration round U13/U14 pending) |
-| **Intent tree** | What I'm pursuing and where it came from, folded from the trace | U15–U19 | ✅ Implemented + accepted |
-| **Loop** | Event → something notices → action → new trace | U20–U24 | 📋 Requirements written (with failure scenarios) |
-| **Bridge** | The switching experience: hand off one sentence and walk away, re-enter any window in one glance, see which line is waiting on me | U25–U29 | 📋 Requirements written (with failure scenarios) |
-| **Canvas** | The second entry point: an infinite surface where arranging things IS thinking, layout belongs to the human, truth stays single-sourced | U30–U34 | 🔨 v0.1 shipped (`canvas/`), iterating directly |
-
-Each module moves through the same pipeline: requirements (no technical vocabulary allowed) → design (citing the prior art each choice borrows from) → acceptance spec (asserting the user's situation, not the mechanism's state) → implementation → mutation lock.
-
-Current test tally: **121 tests passing, 41/41 mutations turn their target test red**.
-
-## Getting started
-
-### Prerequisites
-
-- Linux with a running systemd **user** instance
-- [Node.js](https://nodejs.org) ≥ 22.18 (runs TypeScript directly and ships `node:sqlite`)
-- [pnpm](https://pnpm.io)
-
-### Installation
-
-```bash
-git clone https://github.com/sephirxth/TheseusV2.git
-cd TheseusV2
-pnpm install
-```
-
-### Usage
-
-Declare your parts in `parts.ts` — everything else is derived from it:
-
-```ts
-export const parts: readonly Part[] = [
-  { name: 'bridge',  needs: [],         command: 'exec node bridge.js' },
-  { name: 'watcher', needs: ['bridge'], command: 'exec node watcher.js',
-    ready: 'curl -sf localhost:7700/health' },   // optional readiness probe
-];
-```
-
-```bash
-node src/cli.ts up        # reach the declared state (idempotent; no rollback — fix and rerun)
-node src/cli.ts status    # honest per-part state plus drift in both directions
-node src/cli.ts down      # stop (based on what systemd holds, not what is on disk)
-```
-
-### Testing
-
-```bash
-pnpm typecheck    # tsc --noEmit, strict everything
-pnpm test         # unit + acceptance (acceptance uses public entry points only)
-pnpm mutate       # mutation lock: break each property, expect its test to go red
-```
-
-One acceptance test (U9-3) measures the routine-record ratio against a real ledger from the previous system; point `THESEUS_OLD_LEDGER` at it, or that test reports itself unmeasurable rather than passing quietly.
-
-## Project structure
+V1 started 2026-03-21 as a monorepo named *keel* (龙骨 — the ship's keel; moon and bridge entered as submodules, and moon itself had been running since February — see Prologue). Its **second commit, on day one**, was already about self-improvement:
 
 ```
-parts.ts                  The declaration. This file is the truth; the rest is derived
-src/
-  theseus.ts              up / down / status, dependency precheck, two-way reconciliation
-  unit.ts, state.ts       Part → unit-file translation; the ActiveState translation table
-  systemctl.ts, lock.ts   The only systemctl channel; O_EXCL file lock
-  trace.ts, routine.ts    The trace: its single write gate + which types count as routine
-  doors.ts                Human door / agent door: agents cannot write human-attributed records
-  intent.ts               Intent tree: fold, authority criterion, markers, dangling list
-  cli.ts                  A second adapter over the same three verbs; no behavior lives here
-docs/
-  PRINCIPLES.md           The proven-solutions principle and the four times it won
-  requirements/           What a person needs (no technical vocabulary)
-  design/                 The means chosen, whose prior art each one borrows, ★ on inventions
-  acceptance/             How we know it is delivered (red matters more than green)
-  TODO.md                 Upcoming work
-test/
-  *.test.ts               Unit tests
-  acceptance/*.test.ts    Acceptance: assertions phrased in the spec's own words
-  mutation-lock.mjs       Tests of the tests: a test that never goes red is decoration
+2026-03-21  init: keel monorepo with moon + bridge submodules
+2026-03-21  feat: keel advancement cron — system self-monitoring + organizational leverage
+2026-04-12  docs: 忒修斯重构 spec — 隐喻映射 + 目录结构 + 验收标准   (Theseus refactor spec)
+2026-04-20  bootstrap(stage-1): spawn/judge/runner/scheduler + architecture + 5 stories
+2026-04-28  feat(P12.5): self-build handoff MVP — 每日自省/提议、approved-proposal 穿透
+            (daily self-reflection & proposals, approved-proposal passthrough)
+2026-05-06  feat(bridgeV2): self_projection 真实数据驱动 + directory_self_image 重生
+2026-07-20  feat(memory): expose unique append CLI                    (append-only memory primitive)
+2026-07-20  feat(intent): persist canonical revisions and claims     (intent domain: canonical revisions)
+2026-07-20  feat(intent): add local shadow data flywheel + run local student in shadow
+2026-07-23  perf(watchers): fix O(N^2) full-ledger reads starving the dispatcher
+2026-08-07  chore(memory): 把 L2 手写判据纳入版本控制                (L2 hand-written criteria into VCS)
 ```
 
-## Design philosophy
+107 commits over ~5 months. The **忒修斯 (Theseus) refactor spec** landed 2026-04-12, renaming and reorganizing keel into the ship metaphor. V1 already carried the core ideas in embryo: append-only memory (`unique append CLI`), intent canonization, a shadow student/teacher learning loop, and daily self-reflection proposing its own improvements.
 
-Reach for a proven solution; invent only where this system is genuinely novel ([`docs/PRINCIPLES.md`](docs/PRINCIPLES.md)). Four times this principle replaced an invention with someone else's answer, and each swap made whole categories of requirements disappear:
+### TheseusV2 — the re-launch (2026-08)
 
-| Problem | The invented approach | The proven answer | Outcome |
-|---|---|---|---|
-| Process lifecycle | A 564-line supervisor | **systemd** | 298 lines; the six hardest requirements vanished instead of being solved |
-| Concurrent commands | An in-memory epoch guard | **File lock** (`O_EXCL` on tmpfs, as dpkg and git do) | Works across processes, strictly stronger |
-| Cleaning up strays | Delete by name prefix | **Terraform/Kubernetes answer**: delete only what carries our marker | "Deleting the old system too" became impossible by construction |
-| Trace storage | A homegrown file format | **SQLite** | Durability, dedup, recursive causal queries, and indexes all come built in |
+V2 was initialized on **2026-08-16** (this repository) as a clean re-build around the trace-folding discipline:
 
-The self-built pieces are individually flagged (★) in the design docs and watched separately — they are the most expensive and error-prone parts of the system.
+```
+2026-08-16  init: 启停与痕迹两块完工，意图树与环的设计就位
+            (start/stop + traces complete; intent tree & loop designed)
+2026-08-17  feat(trace): 谁干的必须三段；每条用例补反面场景；量出 U13 的第一组真数字
+            (provenance must be 3-part; negative scenarios per use-case; first real numbers)
+2026-08-19  feat(intent): 意图树完工——树是痕迹上的一次折叠，节点只认挂在人话上的
+            (intent tree done — the tree is a fold over traces; nodes only trust human utterances)
+2026-08-19  docs: PolyForm Noncommercial 许可 + README 英文主入口
+2026-08-19  docs(bridge): 桥的用例 U25–U29——把系统接到我说话的地方
+            (the bridge connects the system to where I speak)
+2026-08-20  feat(canvas): 画布 v0.1 — 直接迭代，不走用例流水线
+2026-08-20  feat(canvas): 幽灵树接入现有意图 + 缩放尺度语义 (v0.2)
+            (ghost tree + zoom-scale semantics)
+2026-08-20  feat(canvas): 缩放三刀 (v0.2.1) → 布局即信息 (v0.2.2) → 连线与时间轴投影 (v0.3)
+2026-08-20  feat(canvas): 真·时间轴——年月日刻度 + 多意图泳道 (v0.3.1)
+            (true timeline — date ticks + multi-intent swimlanes)
+```
 
-## Roadmap
+### After the initial 14 commits
 
-- **Bridge (U25–U29)** — design and implementation: make the multi-window, multi-machine working form survivable — zero-ceremony handoff, one-glance re-entry, attention routing across lines, dropping a note onto another line without jumping there, an enumerable list of open fronts.
-- **Loop (U20–U24)** — design and implementation: closing event → notice → act → trace, with an ask-me gate on irreversible actions and self-feeding protection.
-- **Canvas (U30–U34)** — requirements written (rooted in the author's 2021 PKM requirements and a working 2021 whiteboard prototype); design and implementation follow the bridge. Entry-point consistency (canvas vs. conversation) enters acceptance here.
-- **Ledger migration (U13)** — importing the old system's 149k-record ledger through the new gates.
-- **Cross-agent trace (U14)** — several agents writing one trace.
-- **Hermes Memory Provider bridge** — exposing the layered memory over a standard interface (`docs/TODO.md`).
+The repo's committed core stopped at the canvas v0.3.1 milestone while daily development moved to working-tree flow (requirements/checks//graphs as on-disk artifacts — the IADD structure below). Milestones since (in working tree, progressively committed):
+
+- **U25–U29** — bridge use-cases: connect the system to the owner's messaging surfaces (Hermes gateway bridge).
+- **U30–U34** — canvas use-cases: claims inherited from a 2021 requirements document, not invented fresh.
+- **U37** — procedural process-graph runtime: YAML process graphs + assertion gates + rollback edges. Machine pays the cost once; the second graph is nearly free.
+- **U38** — canvas engine migration: React Flow → **tldraw** (^5.4.2), semantic zoom, three-level LOD.
+- **U39** — knowledge pipeline: ingest → annotate → structure → publish (second process graph on the U37 runtime), with the annotation reader as the human-door bandwidth amplifier.
+
+### Roadmap (next)
+
+- **U40** — service governance: register the 9 systemd units into the declared-parts manifest, `Restart=on-failure`, start/stop events written as traces (the system records its own life).
+- **U41** — evolution metrics: fold one-pass rate / rework rate / human-machine cycle time from traces (never persisted — metrics are folded views), feeding process-graph revisions through a backtest gate. Grounded in the GEPA line of work (language-mediated reflection over scalar rewards), with the human annotation gate as the piece GEPA lacks.
+
+---
+
+## Why "Theseus"?
+
+The ship of Theseus: every plank replaced, yet the ship remains the same ship. This system replaces its own planks — prompts, procedures, graphs, metrics — continuously; identity is preserved not by any stored state but by the **continuity of the trace**. (The name predates the unrelated academic "Theseus Lab" that appeared publicly in Sept 2026; this repo was created 2026-08-16, and its predecessor V1 began 2026-03-21.)
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE) — free for noncommercial use (personal projects, research, education, noncommercial organizations). **Commercial use requires a separate license**: contact sephirxth@gmail.com.
-
-## Acknowledgments
-
-The trace and intent-tree designs borrow heavily from DeepSeek Harness's goal/authority model and Agent Note lifecycle; every borrowed choice is credited in the design documents, and every invention is flagged with a ★.
+MIT (see LICENSE).

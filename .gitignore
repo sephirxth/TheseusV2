@@ -1,3 +1,25 @@
+# ==== 私密层: 绝不入公开仓 ====
+1.human_expressions/
+2.references/
+3.requirements/
+4.checks/
+notes/
+reports/
+history/
+prompt_bridge_design.md
+__pycache__/
 node_modules/
-*.tsbuildinfo
-canvas/dist/
+build/
+*.local
+.env*
+
+# ==== 画布本地态 ====
+canvas/server.ts
+
+# ==== 其他 ====
+*.log
+.DS_Store
+canvas/web/dist/
+canvas/web/node_modules/
+runs/
+.edit.lock

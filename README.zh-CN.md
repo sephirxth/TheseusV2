@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License: PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue"></a>
+  <a href="LICENSE"><img alt="License: MIT License" src="https://img.shields.io/badge/license-MIT-green"></a>
   <img alt="Node >= 22.18" src="https://img.shields.io/badge/node-%3E%3D%2022.18-brightgreen">
   <img alt="Runtime dependencies: 0" src="https://img.shields.io/badge/runtime%20deps-0-orange">
   <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178c6">
@@ -164,7 +164,7 @@ test/
 
 ## 许可证
 
-[PolyForm Noncommercial 1.0.0](LICENSE) —— 非商业用途免费（个人项目、研究、教育、公益组织）。**商业使用需另行授权**：联系 sephirxth@gmail.com。
+[MIT License](LICENSE) —— 非商业用途免费（个人项目、研究、教育、公益组织）。**商业使用需另行授权**：联系 sephirxth@gmail.com。
 
 ## 致谢
 
