@@ -30,7 +30,7 @@ export interface Layout {
 async function must(res: Response): Promise<Response> {
   if (res.ok) return res;
   let msg = `${res.status}`;
-  try { msg = ((await res.json()) as { error?: string }).error ?? msg; } catch { /* 原样 */ }
+  try { msg = ((await res.json()) as { error?: string }).error ?? msg; } catch { /* verbatim */ }
   throw new Error(msg);
 }
 

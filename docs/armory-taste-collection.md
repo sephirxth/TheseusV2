@@ -1,98 +1,98 @@
 # The Armory — Personal Taste Collection
 
-The Armory (`sephirxth/theseus-armory`) is the owner's curated skill library: ~131 skills distilled from real working practice, organized by category. It is the **taste layer** of TheseusV2 — how the system prefers to think, express, verify, and communicate.
+The Armory (`sephirxth/theseus-armory`, private for now) is the owner's curated skill library: ~131 skills distilled from real working practice. It is the **taste layer** of TheseusV2 — how the system prefers to think, express, verify, and communicate.
 
-> 品味合集：这些 skill 不是工具堆砌，是长期工作中沉淀下来的"怎么做某类事"的偏好。
+> A taste collection: these skills are not a pile of tools, but preferences about *how to do certain kinds of things*, distilled from long practice.
 
-## 入选合集（初选清单，待终审）
+## Selected (v0 draft, pending final review)
 
-### 思维与论证
-| skill | 一句话 |
+### Thinking & Argument
+| skill | one-liner |
 |---|---|
-| first-principles / first-principles-derivation / first-principles-grounding | 第一性原理三件套：论证、推导、接地 |
-| jury-panel / multi-persona-jury | 孔多塞陪审团定理的十人正交认知轴审议 |
-| grill-me / grilling / grill-with-docs | 拷问式审查——把方案烤到冒烟为止 |
-| precedent-first-design | 新需求先找人类成熟先例，再谈 AI 增量 |
-| concept-diagram | 概念提取与因果张力图（反容器谬误：基线 S0/势垒墙/SVP） |
-| domain-modeling / ubiquitous-language | 领域建模与统一语言 |
-| verbal-algorithm | 口头算法——先说清算法再写码 |
-| loop-me | 循环式自我审视 |
-| wayfinder | 路径探寻 |
+| first-principles / -derivation / -grounding | first-principles trio: argue, derive, ground |
+| jury-panel / multi-persona-jury | Condorcet-style ten-persona orthogonal-cognition deliberation panel |
+| grill-me / grilling / grill-with-docs | adversarial grilling — roast the plan until it stops smoking |
+| precedent-first-design | name the mature human precedent before inventing |
+| concept-diagram | concept extraction & causal-tension diagrams (anti-container-fallacy: baseline S0 / barrier walls / SVP) |
+| domain-modeling / ubiquitous-language | domain modeling & ubiquitous language |
+| verbal-algorithm | speak the algorithm before coding it |
+| loop-me | looped self-examination |
+| wayfinder | path-finding |
 
-### 验证与工程纪律
-| skill | 一句话 |
+### Verification & Engineering Discipline
+| skill | one-liner |
 |---|---|
-| test-ratchet | 测试棘轮——只进不退的测试纪律 |
-| requesting-code-review / code-review | 提交前审查与代码评审 |
-| diagnosing-bugs | 难症四阶段诊断 |
-| systematic-debugging | 根因调试 |
-| setup-pre-commit | 预提交门禁 |
-| git-guardrails-claude-code | git 安全护栏 |
-| resolving-merge-conflicts | 冲突中立仲裁 |
-| qa | 问题书写的纪律 |
+| test-ratchet | test ratchet — tests only tighten, never loosen |
+| requesting-code-review / code-review | pre-commit review & code review |
+| diagnosing-bugs | four-phase hard-bug diagnosis |
+| systematic-debugging | root-cause debugging |
+| setup-pre-commit | pre-commit gates |
+| git-guardrails-claude-code | git safety guardrails |
+| resolving-merge-conflicts | neutral merge-conflict arbitration |
+| qa | issue-writing discipline |
 
-### 表达与视觉（重量分级）
-| skill | 一句话 |
+### Expression & Visuals (by weight tier)
+| skill | one-liner |
 |---|---|
-| show-me | 第0档：文本树/调用栈/diff——最小说明白一件事（源自 HumanLayer） |
-| scientific-html | 第2档：学术排版 HTML（周刊与技术报告主形态） |
-| eli5 | 复杂概念的人话解释器 |
-| excalidraw-diagram | 手绘风真图形 |
-| concept-figure | 概念图形化 |
-| writing-great-skills | 写好 skill 本身的元技能 |
-| deliver-pdf | PDF 交付 |
+| show-me | tier 0: text trees / call stacks / diff syntax — the smallest view that makes the point (sourced from HumanLayer) |
+| scientific-html | tier 2: academic-grade HTML (the weekly letter / technical report form) |
+| eli5 | plain-language explainers for dense concepts |
+| excalidraw-diagram | hand-drawn-style real diagrams |
+| concept-figure | concept figuration |
+| writing-great-skills | the meta-skill of writing good skills |
+| deliver-pdf | PDF delivery |
 
-### 写作与研究
-| skill | 一句话 |
+### Writing & Research
+| skill | one-liner |
 |---|---|
-| lit-review | 文献综述流程 |
-| paper-essence | 论文本质提炼 |
-| wos-bibliometric | WOS 文献计量 |
-| proposal-writer / proposal-style | 本子（申报书）写作与文风 |
-| report-48h | 48 小时报告法 |
-| notebooklm | NotebookLM 工作流 |
-| obsidian-vault | Obsidian 知识库操作 |
+| lit-review | literature review workflow |
+| paper-essence | paper distillation |
+| wos-bibliometric | Web-of-Science bibliometrics |
+| proposal-writer / proposal-style | grant-proposal writing & style |
+| report-48h | the 48-hour report method |
+| notebooklm | NotebookLM workflows |
+| obsidian-vault | Obsidian vault operation |
 
-### 信息摄入
-| skill | 一句话 |
+### Information Intake
+| skill | one-liner |
 |---|---|
-| x-ingest / wechat-article-ingest / xiaohongshu-ingest | 三平台内容摄入 |
-| bili2text | B 站视频转文字 |
-| asr | 语音转写服务 |
-| web-access | 网页访问 |
+| x-ingest / wechat-article-ingest / xiaohongshu-ingest | three-platform content ingestion |
+| bili2text | Bilibili video to text |
+| asr | speech transcription service |
+| web-access | web access |
 
-### 办公与协作（飞书生态）
-lark-* / feishu-cli-* 系列（doc/sheets/base/im/mail/calendar/minutes/okr/slides/whiteboard/workflow 等约 40 个）——飞书全家桶的 CLI 化操作。
+### Office & Collaboration (Feishu ecosystem)
+lark-* / feishu-cli-* series (~40): doc / sheets / base / im / mail / calendar / minutes / okr / slides / whiteboard / workflow — the Feishu suite, CLI-operated. Listed here as one line by design: ecosystem tools, not taste statements.
 
-### 游戏与资产
-| skill | 一句话 |
+### Games & Assets
+| skill | one-liner |
 |---|---|
-| gameui / gameui-score | 游戏 UI 与评分 |
-| godot-android-export-packaging | Godot APK 导出与签名 |
-| game-unpack / game-reverse | 游戏解包与逆向 |
-| codex-imagegen | 生图链编排 |
-| numeric-forge / numeric-systems / game-numerical-design | 数值设计与建模 |
+| gameui / gameui-score | game UI & scoring |
+| godot-android-export-packaging | Godot APK export & signing |
+| game-unpack / game-reverse | game unpacking & reverse engineering |
+| codex-imagegen | image-generation chain orchestration |
+| numeric-forge / numeric-systems | numerical design & modeling |
 
-### 运维与自我管理
-| skill | 一句话 |
+### Operations & Self-Management
+| skill | one-liner |
 |---|---|
-| skill-management / skillspector / find-skills | skill 的管理与巡检 |
-| handoff / implement / executor-guide / triage | 任务交接与执行纪律 |
-| migrate-to-shoehorn / scaffold-exercises | 迁移与练习脚手架 |
-| improve-codebase-architecture | 架构改进流程 |
+| skill-management / skillspector / find-skills | skill curation & inspection |
+| handoff / implement / executor-guide / triage | task handoff & execution discipline |
+| migrate-to-shoehorn / scaffold-exercises | migration & exercise scaffolding |
+| improve-codebase-architecture | architecture-improvement flow |
 
-## 未入选（私有层，不进合集）
+## Excluded (private layers, never in the collection)
 
-- **youyuan-voice** — 用户本人的中文文风蒸馏（个人语料，永不公开）
-- info-ingest / research-knowledge 内部 vendor 与爬虫配置 — 私有基础设施
-- var/ archive/ synthesis/ — 运行状态与事件账本
-- 纯环境绑定类（claude-cache、windows-cache 等）
+- **youyuan-voice** — the owner's Chinese writing-style distillation (personal corpus, never public)
+- info-ingest / research-knowledge internal vendor & crawler config — private infrastructure
+- var/ archive/ synthesis/ — runtime state & event ledgers
+- environment-bound caches (claude-cache, windows-cache, etc.)
 
-## 使用原则
+## Operating Principles
 
-1. **正源在 armory**，各 agent（claude/codex/hermes）通过软链激活；不留单机孤儿
-2. **先问档位再动笔**：表达类按重量分级选最轻够用的
-3. 新 skill 先沉淀 armory、再链接、再使用——顺序不可反
+1. **The armory is the source of truth**; each agent (claude/codex/hermes) activates by symlink. No orphan copies.
+2. **Ask the tier before writing**: for expression, pick the lightest sufficient weight.
+3. New skills: sediment into the armory first, then link, then use — order matters.
 
 ---
-*此清单为初选（v0），由 agent 按记忆与使用频率起草，**待所有者终审**；终审后同步至 armory README 并公开。*
+*This list is draft v0, assembled by the agent from memory and usage frequency; **pending owner review**. After final review it will sync to the armory README and be published.*
