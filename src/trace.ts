@@ -1,21 +1,21 @@
 /**
- * 痕迹：留下的那份东西。**留痕**是写它，**追踪**是读它。
+ * Traces: what is left behind. **Recording** writes it; **tracing** reads it.
  *
- * 底座是 SQLite（docs/design/trace.md 0.5）。用的是 Node 22 内建的 `node:sqlite`——
- * 不引任何外部依赖，一个库文件，没有服务、没有守护进程、没有端口。
+ * The foundation is SQLite (docs/design/trace.md 0.5). Uses Node 22's built-in `node:sqlite` —
+ * zero external dependencies, one library file, no service, no daemon, no port.
  *
- * 这个文件是**唯一的那道门**：所有写入从 `record` 进来，禁止绕过去直接动库
- * （照搬旧 Theseus 的 memory 契约——那是它做得最对的一件事）。
+ * This file is **the only door**: all writes come through `record`; touching the store directly is forbidden
+ * (inherited from old Theseus's memory contract — the one thing it did most right).
  *
- * 四件"痕迹不能丢、不能重"的硬约束，全是现成的，一行自己的逻辑都不写：
- *   写一半崩了 -> 一条一个事务（单条 INSERT 本身就是一个事务，ARIES 预写日志，SQLite 内建）
- *   同一件事记两遍 -> `idem` 唯一约束（Stripe 的幂等键）
- *   边写边读读到半条 -> WAL
- *   多个写入方 -> SQLite 自己排队
+ * Four hard constraints of "traces must not be lost, must not be duplicated" — all off-the-shelf, zero lines of own logic:
+ *   crash mid-write -> one transaction per row (a single INSERT is a transaction; ARIES write-ahead log, SQLite built-in)
+ *   the same thing recorded twice -> `idem` unique constraint (Stripe's idempotency key)
+ *   reader sees a half-written row -> WAL
+ *   multiple writers -> SQLite queues them itself
  *
- * 还有一件是白捡的：`CHECK (cause IS NULL OR cause < id)`。ULID 按时间排序，所以这是
- * 一句纯字符串比较，**却让因果成环从结构上不可能**——成环意味着某条记录是自己的祖先，
- * 那要求它比自己早。它替掉了本来要写的一整套环检测。
+ * One more comes free: `CHECK (cause IS NULL OR cause < id)`. ULIDs sort by time, so this is
+ * a pure string comparison, **yet makes causal cycles structurally impossible** — a cycle would mean a record is its own ancestor,
+ * which requires it to be earlier than itself. It replaces an entire cycle-detection module that would otherwise be written.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
@@ -23,22 +23,22 @@ import { dirname } from 'node:path';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { isRoutine } from './routine.ts';
 
-/** 我认得的三种起点。走到头必须落在其中之一，不许停在一个人不认识的东西上。 */
+/** The three origins I recognize. Walking back must end in one of them; stopping on something a human does not recognize is forbidden. */
 export type Origin = 'you-said' | 'clock-fired' | 'arrived-from-outside';
 
-/** 交给这道门的一笔。`cause` 和 `origin` 二选一：要么有上一步，要么自己是个起点。 */
+/** One entry handed to this door. `cause` and `origin` are mutually exclusive: either there is a prior step, or this is an origin. */
 export interface Mark {
-  /** 谁干的：namespace:type:session */
+  /** who did it: namespace:type:session */
   readonly actor: string;
   readonly type: string;
-  /** 上一步是哪条。 */
+  /** Which trace is the prior step. */
   readonly cause?: string;
-  /** 没有上一步时，必须说清自己是哪种起点。 */
+  /** With no prior step, which kind of origin this is must be stated. */
   readonly origin?: Origin;
   readonly payload?: Readonly<Record<string, unknown>>;
-  /** 凭什么这么定 / 这么判断。决定与自我总结必须给。 */
+  /** On what basis this was decided / judged. Required for decisions and self-summaries. */
   readonly basis?: readonly string[];
-  /** 幂等键；不给的不参与去重。 */
+  /** Idempotency key; records without one do not participate in dedup. */
   readonly idem?: string;
 }
 
@@ -55,38 +55,38 @@ export interface Step {
 }
 
 /**
- * 链子走到头，落在哪儿。**这几种必须分得清清楚楚**——一条"技术上完整、实际上没回答
- * 问题"的链子，长得和一条好链子一模一样；断了你知道自己不知道，编了你以为自己知道。
+ * Where the chain ends. **These must be told apart precisely** — a chain that is technically complete but does not answer
+ * the question looks exactly like a good chain; broken, you know you don't know; fabricated, you think you know.
  */
 export type ChainEnd =
-  /** 走到一个我认得的起点。 */
+  /** Ends at an origin I recognize. */
   | { readonly kind: 'origin'; readonly at: string; readonly origin: Origin }
-  /** 走到一条没有上一步、也说不出自己是哪种起点的记录。经这道门写不出来，只可能是外面塞进来的。 */
+  /** Ends at a record with no prior step and no stated origin. This door cannot write it; it can only have been shoved in from outside. */
   | { readonly kind: 'unrecognized'; readonly at: string; readonly type: string }
-  /** 它指着的那条不在。**这里断了**，不许猜一个接上去。 */
+  /** The trace it points to is missing. **Broken here**; guessing one to attach is forbidden. */
   | { readonly kind: 'broken'; readonly at: string; readonly missing: string }
-  /** 超过深度上限，还没走到头。**我没走完，不是我到头了。** */
+  /** Depth cap exceeded before reaching an end. **I did not finish walking — it is not that I reached the end.** */
   | { readonly kind: 'too-deep'; readonly at: string }
-  /** 问的那条根本不在。 */
+  /** The trace being asked about does not exist at all. */
   | { readonly kind: 'no-such-step'; readonly at: string };
 
 export interface Chain {
-  /** [被问的那条, 它的上一步, …]。 */
+  /** [the asked trace, its prior step, ...]. */
   readonly steps: readonly Step[];
   readonly end: ChainEnd;
 }
 
 export interface TraceOptions {
-  /** 现在几点（epoch 毫秒）。只有测试和补记会给。 */
+  /** The time (epoch ms). Only tests and backfill provide it. */
   readonly now?: () => number;
 }
 
-/** 这道门拒了。**理由必须说得出来**——一条只会拒不说为什么的门，等于一堵墙。 */
+/** This door refused. **The reason must be stateable** — a door that only refuses without saying why is just a wall. */
 export class TraceRefused extends Error {
   override readonly name = 'TraceRefused';
 }
 
-/** 第二道保险：防的是数据从别处被硬塞进来的情况。第一道是 CHECK。 */
+/** Second line of defense: guards against data shoved in from elsewhere. The first line is the CHECK. */
 const DEPTH = 64;
 
 const COLS = 'id, ts, actor, type, cause, routine, payload';
@@ -104,9 +104,9 @@ CREATE TABLE IF NOT EXISTS trace (
 
   CHECK (cause IS NULL OR cause < id),
 
-  -- 三段，且每段非空。上面 record() 里那道门是给人看的错误信息，
-  -- 这一条是给"绕过门直接写库的人"准备的：门是约定，约束是结构。
-  -- '_%' 要求每段至少一个字符；后半句挡掉四段及以上。
+  -- three segments, each non-empty. The door in record() above produces human-readable errors;
+  -- this one is for whoever bypasses the door and writes the store directly: the door is convention, the constraint is structure.
+  -- '_%' requires at least one character per segment; the second half rejects four or more segments.
   CHECK (actor LIKE '_%:_%:_%' AND actor NOT LIKE '%:%:%:%')
 );
 CREATE INDEX IF NOT EXISTS trace_cause  ON trace(cause);
@@ -116,7 +116,7 @@ CREATE INDEX IF NOT EXISTS trace_actor  ON trace(actor);
 CREATE INDEX IF NOT EXISTS trace_recent ON trace(routine, id DESC);
 `;
 
-/** 往回问"为什么发生"。一句递归查询走完全程，而且走的是主键。 */
+/** Ask backwards "why did this happen". One recursive query walks the whole chain, on the primary key. */
 const BACK = `
 WITH RECURSIVE chain(id, ts, actor, type, cause, routine, payload, depth) AS (
   SELECT ${COLS}, 0 FROM trace WHERE id = ?
@@ -128,10 +128,10 @@ WITH RECURSIVE chain(id, ts, actor, type, cause, routine, payload, depth) AS (
 SELECT * FROM chain`;
 
 /**
- * 往前问"这个要求后来怎么了"。走两种边：**它是谁的上一步**，以及**谁拿它当依据**。
+ * Ask forwards "what became of this request". Two edge kinds: **whose prior step it is**, and **who cites it as basis**.
  *
- * 只走前一种是不够的：两个要求被并成一件时，被并掉的那个不是任何人的上一步——
- * 而那正是当年 numpy 2.2.0 一声不吭消失的位置。
+ * Walking only the first is insufficient: when two requests merge into one, the merged-away one is nobody's prior step —
+ * which is exactly where numpy 2.2.0 once vanished without a sound.
  */
 const FORWARD = `
 WITH RECURSIVE fwd(id, depth) AS (
@@ -173,10 +173,10 @@ const rand80 = (): bigint => {
   return n;
 };
 
-/** 决定本身要留下来，还要留下它当时凭什么这么定。 */
+/** The decision itself must stay, along with the basis it was decided on at the time. */
 const isDecision = (type: string): boolean => type.startsWith('decision.');
 
-/** 系统关于它自己的话：反思 / 自我认知 / 改进结论。 */
+/** The system's words about itself: reflections / self-assessment / improvement conclusions. */
 const isConclusion = (type: string): boolean => type.startsWith('self.');
 
 export class Trace {
@@ -190,68 +190,68 @@ export class Trace {
     this.#now = o.now ?? Date.now;
     mkdirSync(dirname(file), { recursive: true });
     this.#db = new DatabaseSync(file);
-    this.#db.exec('PRAGMA journal_mode = WAL');       // 读的人看到的永远是完整状态
+    this.#db.exec('PRAGMA journal_mode = WAL');       // readers always see a complete state
     this.#db.exec('PRAGMA synchronous = NORMAL');
-    this.#db.exec('PRAGMA foreign_keys = ON');        // `cause` 指着的那条必须真在，删也删不掉
-    this.#db.exec('PRAGMA busy_timeout = 5000');      // 多个写入方：排队，不是报错
+    this.#db.exec('PRAGMA foreign_keys = ON');        // what `cause` points to must exist, undeletable
+    this.#db.exec('PRAGMA busy_timeout = 5000');      // multiple writers: queue, not error
     this.#db.exec(SCHEMA);
   }
 
   /**
-   * 唯一的那道门。
+   * The only door.
    *
-   * 拒的时候都在说同一件事：**别让一条将来查不动的痕迹进来。**
-   * 没有上一步又说不出自己是哪种起点的，链子会停在一个人不认识的东西上；
-   * 上一步不存在的，链子从出生就断了；决定不带依据的，查出来只有"它没做"。
+   * Every refusal says the same thing: **do not let in a trace that cannot be walked later.**
+   * Without a prior step and no stated origin, the chain stops on something a human does not recognize;
+   * with a nonexistent prior step, the chain is broken from birth; a decision without basis yields only "it did not do it".
    */
   record(m: Mark): Step {
-    // 谁干的，必须分三段：地盘:身份:这一次。
-    // 中间那段是"人还是 agent"的唯一依据——意图树整条判据压在它上面
-    // （"上一步那条的中间段是 human 才算我的意图"）。它要是个自由字符串，
-    // 那条判据就是在猜。
+    // who did it: three segments — namespace:identity:session.
+    // the middle segment is the sole basis of human-vs-agent — the intent tree's whole criterion rests on it
+    // ("the prior step's middle segment must be human to count as my intent"). If it were a free string,
+    // that criterion would be guessing.
     //
-    // 卡在这里而不是只写进文档，是因为这张表只追加：等有了真数据再加约束，
-    // 就得重建这张表，而"痕迹不改写"是这套东西的立身之本。
+    // Pinned here rather than only in docs because this table is append-only: adding constraints after real data exists
+    // would require rebuilding the table, and "traces are never rewritten" is the foundation of the whole thing.
     const seg = m.actor.split(':');
     if (seg.length !== 3 || seg.some((s) => s === '')) {
-      throw new TraceRefused(`'${m.type}': 谁干的写成了 '${m.actor}' ——`
-        + ` 必须是三段 地盘:身份:这一次（如 user:human:cli / agent:codex:sess-a1），`
-        + ` 三段都不能空。中间那段决定这条痕迹算不算人说的。`);
+      throw new TraceRefused(`'${m.type}': who-did-it was written as '${m.actor}' —`
+        + ` must be three segments namespace:identity:session (e.g. user:human:cli / agent:codex:sess-a1),`
+        + ` none empty. The middle segment decides whether this trace counts as human speech.`);
     }
 
     const hasCause = m.cause !== undefined;
     const hasOrigin = m.origin !== undefined;
     if (hasCause && hasOrigin) {
-      throw new TraceRefused(`'${m.type}': 同时给了上一步和起点种类 —— 一条痕迹只能是其中一种`);
+      throw new TraceRefused(`'${m.type}': both prior step and origin given — a trace can only be one of them`);
     }
     if (!hasCause && !hasOrigin) {
-      throw new TraceRefused(`'${m.type}': 既没有上一步，也没说自己是哪种起点`
-        + `（我认得的起点只有三种：you-said / clock-fired / arrived-from-outside）`);
+      throw new TraceRefused(`'${m.type}': neither a prior step, nor a stated origin`
+        + `(I recognize exactly three origins: you-said / clock-fired / arrived-from-outside)`);
     }
     if (m.cause !== undefined && this.get(m.cause) === null) {
-      throw new TraceRefused(`'${m.type}': 上一步 ${m.cause} 不在痕迹里`);
+      throw new TraceRefused(`'${m.type}': prior step ${m.cause} not in the traces`);
     }
 
     const basis = m.basis ?? [];
     const grounds = basis.map((id) => {
       const s = this.get(id);
-      if (s === null) throw new TraceRefused(`'${m.type}': 依据 ${id} 不在痕迹里`);
+      if (s === null) throw new TraceRefused(`'${m.type}': basis ${id} not in the traces`);
       return s;
     });
     if ((isDecision(m.type) || isConclusion(m.type)) && grounds.length === 0) {
-      throw new TraceRefused(`'${m.type}': 没有依据 —— 决定和自我总结必须留下它当时凭什么这么定`);
+      throw new TraceRefused(`'${m.type}': no basis — decisions and self-summaries must record what they were decided on`);
     }
-    // U10-4。一条只检查形式的规矩会被形式满足：2026-06-10 那次导入给 2300 份文档
-    // 各盖了一个"我属于第 N 批"的锚，规矩被满足了，满足得毫无意义。例行公事是机械动作、
-    // 无语义，它可以是背景，**不可以是一条结论的全部依据**。
+    // U10-4. A rule that only checks form gets satisfied by form: the 2026-06-10 import stamped 2300 documents
+    // each with an "I belong to batch N" anchor — the rule satisfied, meaninglessly. Routine is mechanical action,
+    // no semantics: it may be background, **never the entire basis of a conclusion**.
     if (isConclusion(m.type) && !grounds.some((g) => !g.routine)) {
-      throw new TraceRefused(`'${m.type}': 依据全是例行公事（${grounds.map((g) => g.type).join(', ')}）`
-        + ` —— 那是"这份东西属于第几批"，不是"这条结论从哪来"`);
+      throw new TraceRefused(`'${m.type}': basis is all routine (${grounds.map((g) => g.type).join(', ')})`
+        + ` — that says which batch this belongs to, not where this conclusion comes from`);
     }
 
     if (m.idem !== undefined) {
       const hit = this.#byIdem(m.idem);
-      if (hit !== null) return hit;                  // 同一件事，返回原来那条，不报错
+      if (hit !== null) return hit;                  // same event: return the original row, no error
     }
 
     const { id, ts } = this.#mint();
@@ -261,12 +261,12 @@ export class Trace {
       body: m.payload ?? {},
     });
     try {
-      // 单条 INSERT 自己就是一个事务：要么整条进去，要么当没发生。
+      // A single INSERT is itself a transaction: either the whole row lands, or it never happened.
       this.#db.prepare(`INSERT INTO trace(${COLS}, idem) VALUES(?,?,?,?,?,?,?,?)`).run(
         id, ts, m.actor, m.type, m.cause ?? null, isRoutine(m.type) ? 1 : 0, payload, m.idem ?? null,
       );
     } catch (e) {
-      // 另一个写入方抢先用同一个幂等键写进去了：那就是同一件事，返回它那条。
+      // Another writer used the same idempotency key first: same event — return theirs.
       if (m.idem !== undefined) {
         const hit = this.#byIdem(m.idem);
         if (hit !== null) return hit;
@@ -274,7 +274,7 @@ export class Trace {
       throw new TraceRefused(`'${m.type}': ${(e as Error).message}`);
     }
     const written = this.get(id);
-    if (written === null) throw new TraceRefused(`'${m.type}': 写完了却读不回来（${id}）`);
+    if (written === null) throw new TraceRefused(`'${m.type}': written but unreadable (${id})`);
     return written;
   }
 
@@ -283,7 +283,7 @@ export class Trace {
     return row === undefined ? null : toStep(row);
   }
 
-  /** U7：往回问"它为什么会发生"。 */
+  /** U7: ask backwards "why did it happen". */
   why(id: string): Chain {
     const rows = this.#db.prepare(BACK).all(id) as unknown as Row[];
     if (rows.length === 0) return { steps: [], end: { kind: 'no-such-step', at: id } };
@@ -302,15 +302,15 @@ export class Trace {
     return { steps, end: { kind: 'broken', at: tail.id, missing: tail.cause } };
   }
 
-  /** U8：往前问"我那个要求后来怎么了"。 */
+  /** U8: ask forwards "what became of my request". */
   became(id: string): readonly Step[] {
     return (this.#db.prepare(FORWARD).all(id, id) as unknown as Row[]).map(toStep);
   }
 
   /**
-   * 某一类痕迹，从头到尾按发生顺序。意图树的折叠从这儿读（design/intent.md 1.2）：
-   * 折叠没有自己的存储，它每次都从这里重新长出来。
-   * 前缀按字面比对，不是模式——`_` 在这儿就是下划线。
+   * One class of traces, start to end, in order. The intent tree's fold reads from here (design/intent.md 1.2):
+   * the fold has no storage of its own; it regrows from here every time.
+   * Prefixes match literally, not as patterns — `_` here is just an underscore.
    */
   ofType(prefix: string): readonly Step[] {
     const rows = this.#q(
@@ -320,12 +320,12 @@ export class Trace {
   }
 
   /**
-   * 这条之后，人有没有再开口。"没接"的边界压在它上面（design/intent.md 3.2）：
-   * 用对话自己的节拍当边界，不用墙上的钟——计时器会因为我今天忙就冤枉 agent 一次，
-   * 而一条会冤枉人的检验，和一条不会说"不"的检验一样坏。
+   * Whether the human spoke again after this row. The "unanswered" boundary rests on this (design/intent.md 3.2):
+   * the boundary is the conversation's own rhythm, not the wall clock — a timer wrongs the agent whenever I am busy today,
+   * and a check that can wrong someone is as bad as a check that never says no.
    *
-   * `'%:human:%'` 比对的就是中间那段：actor 被门卡死为恰好三段（两个冒号），
-   * 所以两边都有冒号的 human 只可能落在中间。
+   * `'%:human:%'` matches exactly the middle segment: the door pins actor at exactly three segments (two colons),
+   * so a human flanked by colons can only land in the middle.
    */
   humanSpokeAfter(id: string): boolean {
     return this.#q(
@@ -333,7 +333,7 @@ export class Trace {
     ).get(id) !== undefined;
   }
 
-  /** U9：看看最近都发生了什么。**默认不给例行公事**，要全部就明说。 */
+  /** U9: what happened recently. **Routine is excluded by default**; ask explicitly for everything. */
   recent(o: { limit?: number; includeRoutine?: boolean } = {}): readonly Step[] {
     const rows = this.#db.prepare(
       `SELECT ${COLS} FROM trace WHERE (? = 1 OR routine = 0) ORDER BY id DESC LIMIT ?`,
@@ -342,10 +342,10 @@ export class Trace {
   }
 
   /**
-   * U12：部件的输出。**旁路截获，不是主动上报**——部件只管往 stdout 写，
-   * systemd 把它接到文件里，这里把文件收进痕迹。**没有任何人需要记得多敲一条命令。**
+   * U12: component output. **Bypass interception, not active reporting** — components just write to stdout,
+   * systemd pipes it to files, and here the files enter the traces. **No one needs to remember an extra command.**
    *
-   * 幂等键是纯函数：同样的文件、同样的位置、同样的一行，永远同样的键。扫多少遍都不会记两遍。
+   * The idempotency key is a pure function: same file, same position, same line — always the same key. No number of scans double-records.
    */
   absorb(dir: string): number {
     let n = 0;
@@ -370,12 +370,12 @@ export class Trace {
   }
 
   /**
-   * U11：老数据降采样，**不是删除**（RRDtool 1999 起、Prometheus 至今的标准做法：
-   * 越老的分辨率越低，但永远不消失）。
+   * U11: old data downsamples, **is not deleted** (standard practice since RRDtool 1999 and still in Prometheus:
+   * older means lower resolution, never gone).
    *
-   * 只折叠例行公事，而且**只折叠没有任何人指着的那些**——被当作上一步或依据的一条都不动。
-   * 这不是靠"例行事件基本不被当原因"这个说法，是查出来的；外加 `foreign_keys = ON`
-   * 做第二道，真删到被指着的那条会当场失败而不是留下一条断链。
+   * Folds only routine, and **only what nothing points to** — anything serving as a prior step or basis is untouched.
+   * Not by the claim that routine is rarely cited — it is queried; plus `foreign_keys = ON`
+   * as a second line: deleting a pointed-to row fails on the spot instead of leaving a broken link.
    */
   compact(o: { olderThanDays: number }): { folded: number; summaries: number } {
     const cutoff = new Date(this.#now() - o.olderThanDays * 86_400_000).toISOString();
@@ -421,7 +421,7 @@ export class Trace {
     return row === undefined ? null : toStep(row);
   }
 
-  /** 同一句 SQL 只编译一次。喂一整个月的旧账本时这一步值大约十倍。 */
+  /** The same SQL compiles once. Feeding a month of old ledger, this is worth roughly tenfold. */
   #q(sql: string): StatementSync {
     let s = this.#stmts.get(sql);
     if (s === undefined) { s = this.#db.prepare(sql); this.#stmts.set(sql, s); }
@@ -429,11 +429,11 @@ export class Trace {
   }
 
   /**
-   * ULID：按时间排序、不需要任何协调就能保证唯一。同一毫秒里连着写就把随机那段加一，
-   * 所以**同一个写入方的号严格递增**。
+   * ULID: time-sortable, unique without any coordination. Consecutive writes in the same millisecond increment the random part,
+   * so **one writer's numbers strictly increase**.
    *
-   * 钟往回走时**不替它圆场**：号照实反映这个时刻。于是一个钟慢了的写入方去指一条更晚的
-   * 记录时，`CHECK (cause < id)` 会当场拒掉——那正是它存在的理由。
+   * A clock running backwards is **not smoothed over**: numbers reflect the moment truthfully. So a slow-clocked writer pointing at a later
+   * At record time, `CHECK (cause < id)` rejects on the spot — which is exactly why it exists.
    */
   #mint(): { id: string; ts: string } {
     const ms = Math.floor(this.#now());

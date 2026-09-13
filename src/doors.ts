@@ -1,48 +1,48 @@
 /**
- * 两道门（docs/design/intent.md 2.3）。
+ * Two doors (docs/design/intent.md 2.3).
  *
- * "是不是我的意图"整条判据压在 actor 的中间段上（human 与否）。这条判据要有
- * 东西兜着：agent 只要写得出一条中间段是 `human` 的痕迹，判据就被绕过去了。
+ * The whole "is it my intent" criterion rests on the actor's middle segment (human or not). This criterion needs
+ * something backing it: if an agent can write a trace whose middle segment is `human`, the criterion is bypassed.
  *
- * 做法照 DeepSeek Harness：他们的模型够不着宿主入口，所以伪造不出"人说的话"。
- * 我们的对应物——
+ * The approach follows DeepSeek Harness: their model cannot reach the host entry, so it cannot fabricate a human utterance.
+ * Our counterpart —
  *
- *   人的门（转录截获 / CLI / 面板）   只替人开口：中间段必须是 `human`
- *   agent 的门（MCP 工具、CLI 子命令该接的那个）   写不出：中间段是 `human` 的当场被拒
+ *   human door (transcription intercept / CLI / panel)   speaks only for the human: middle segment must be `human`
+ *   agent door (the one MCP tools / CLI subcommands plug into)   cannot write: middle segment `human` is rejected on the spot
  *
- * 默认值的方向也照他们踩过的坑反着定（authority.ts:67-68 的警告）：不声明自己
- * 是谁的生产者，在这里**得不到**人的权限——不是我们更小心，是这个错误没地方犯。
+ * Default direction is also set against the pit they hit (authority.ts:67-68 warning): a producer that does not declare
+ * who it is **does not get** human privileges here — not because we are more careful, but because the mistake has nowhere to happen.
  *
- * ★5 必须说清楚：两道门在同一个进程里。能直接 import `Trace` 的代码仍然伪造
- * 得出"人说的话"；拦得住的是 agent 实际够得着的那个入口。DSH 同样只拦到这一层。
+ * ★5 must be said clearly: both doors live in one process. Code that can directly import `Trace` can still forge
+ * a human utterance; what is blocked is the entry the agent can actually reach. DSH blocks only to this layer too.
  */
 import { TraceRefused } from './trace.ts';
 import type { Mark, Step, Trace } from './trace.ts';
 
-/** actor 的中间段：`namespace:type:session` 里决定"人还是 agent"的那一段。 */
+/** The actor's middle segment: the segment of `namespace:type:session` deciding human-vs-agent. */
 export const middleOf = (actor: string): string => actor.split(':')[1] ?? '';
 
 export interface Door {
   record(m: Mark): Step;
 }
 
-/** agent 够得着的那个入口。 */
+/** The entry the agent can reach. */
 export const agentDoor = (t: Trace): Door => ({
   record(m: Mark): Step {
     if (middleOf(m.actor) === 'human') {
       throw new TraceRefused(
-        `'${m.type}': agent 的门写不出"人说的话"（'${m.actor}' 的中间段是 human）`);
+        `'${m.type}': the agent door cannot write human utterances (middle segment of '${m.actor}' is human)`);
     }
     return t.record(m);
   },
 });
 
-/** 人的门。别的生产者必须显式声明自己是谁，不许静默继承人的权限。 */
+/** The human door. Other producers must explicitly declare who they are; silent inheritance of human privileges is forbidden. */
 export const humanDoor = (t: Trace): Door => ({
   record(m: Mark): Step {
     if (middleOf(m.actor) !== 'human') {
       throw new TraceRefused(
-        `'${m.type}': 人的门只替人开口（'${m.actor}' 的中间段不是 human）`);
+        `'${m.type}': the human door speaks only for the human (middle segment of '${m.actor}' is not human)`);
     }
     return t.record(m);
   },

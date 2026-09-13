@@ -6,8 +6,8 @@ export class SystemdUnavailable extends Error {
   override readonly name = 'SystemdUnavailable';
 }
 
-// systemd 说这句话的方式随版本变：老的说 "connect to bus"，257 起（EC2 实测）说
-// "connect to user scope bus via local transport"。两种都得认出来，认不出就退化成 E7 要防的那种普通报错。
+// systemd phrases this differently across versions: older says "connect to bus"; since 257 (verified on EC2) says
+// "connect to user scope bus via local transport". Both must be recognized; failing that degrades into the ordinary error E7 guards against.
 const UNREACHABLE = /Failed to connect to (the )?(user scope )?bus|Refusing to operate|D-?Bus connection|No such file or directory.*bus/i;
 
 /** Every systemctl call in the codebase goes through here, so E7 has one place to live. */
