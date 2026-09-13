@@ -1,5 +1,5 @@
-// 和服务端的五条线：树（现场折叠）、提议（幽灵）、布局（位置+便签+连线+视图）、
-// 动作（人的门）、变更通知。
+// Five lines to the server: tree (folded on demand), proposals (ghosts), layout (position+notes+links+view),
+// actions (the human gate), change notifications.
 
 export interface TreeNode {
   id: string;
@@ -13,11 +13,11 @@ export interface TreeNode {
 }
 export interface TreeData { current: string | null; line: string; nodes: TreeNode[] }
 
-/** agent 提的、还没被回应的：画成幽灵，认了才上树。at = 它所指之事的登记日期。 */
+/** Agent-proposed, not yet answered: rendered as a ghost; joins the tree once accepted. at = registration date of the thing it refers to. */
 export interface Proposal { id: string; text: string; at: string | null; ts: string; parent: string | null }
 
 export interface Note { id: string; x: number; y: number; w?: number; h?: number; s?: number; t?: number; text: string }
-/** 原生连线：人画的关联批注——和出生边/融合边（痕迹的投影）不是一个东西。 */
+/** 原生连线：人画的关联批注——和birth edge/merge edge（痕迹的投影）不是一个东西。 */
 export interface Link { id: string; from: string; to: string; label?: string }
 export interface Layout {
   positions: Record<string, { x: number; y: number; s?: number }>;

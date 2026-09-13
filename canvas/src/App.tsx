@@ -41,10 +41,10 @@ interface AxisData {
 
 /** Level bar: overview + four persistent levels (keys 0-4 jump directly), also shows the current level. */
 const LAYERS: { key: string; label: string; zoom: number }[] = [
-  { key: '1', label: '大局 0.1×', zoom: 0.1 },
-  { key: '2', label: '中景 0.3×', zoom: 0.3 },
-  { key: '3', label: '阅读 1×', zoom: 1 },
-  { key: '4', label: '细节 2×', zoom: 2 },
+  { key: '1', label: 'overview 0.1x', zoom: 0.1 },
+  { key: '2', label: 'mid 0.3x', zoom: 0.3 },
+  { key: '3', label: 'read 1x', zoom: 1 },
+  { key: '4', label: 'detail 2x', zoom: 2 },
 ];
 
 function LayerBar() {
@@ -52,11 +52,11 @@ function LayerBar() {
   const { zoomTo, fitView } = useReactFlow();
   return (
     <Panel position="bottom-center" className="layerbar">
-      <button title="快捷键 0" onClick={() => void fitView({ duration: 350, padding: 0.15 })}>全景</button>
+      <button title="hotkey 0" onClick={() => void fitView({ duration: 350, padding: 0.15 })}>overview</button>
       {LAYERS.map((l) => (
         <button
           key={l.key}
-          title={`快捷键 ${l.key}`}
+          title={`hotkey ${l.key}`}
           className={Math.abs(zoom - l.zoom) / l.zoom < 0.25 ? 'here' : ''}
           onClick={() => void zoomTo(l.zoom, { duration: 300 })}
         >{l.label}</button>
@@ -76,28 +76,28 @@ export default function App() {
   const [sayText, setSayText] = useState('');
   const [whyText, setWhyText] = useState('');
   const [err, setErr] = useState('');
-  /** 视图投影：自由布局（人摆的）/ 时间轴（横轴时间、纵轴意图线，算出来的）。 */
+  /** View projection: free layout (human-placed) / timeline (time on x, intent lines on y, computed). */
   const [mode, setMode] = useState<'free' | 'timeline'>('free');
   const [axis, setAxis] = useState<AxisData | null>(null);
-  /** 两条真意图之间拖了线：问一句是"融合"还是"只是相关"。 */
+  /** A line dragged between two real intents: ask whether it is a merge or just related. */
   const [pendingConnect, setPendingConnect] = useState<{ a: string; b: string } | null>(null);
   const [mergeWhy, setMergeWhy] = useState('');
-  /** 布局的唯一真身。state 只负责触发重画；存盘、视口、冲刷都走这个 ref。 */
+  /** The single source of truth for layout. State only triggers repaint; persistence, viewport, flushing all go through this ref. */
   const layoutRef = useRef<Layout | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialViewDone = useRef(false);
-  /** 本次渲染里每个东西实际落在哪（含自动摆位的），认领实体化/手调大小按这个原位落地。 */
+  /** Where each thing actually landed in this render (including auto-placed); claim materialization and manual resize land in-place by this. */
   const posRef = useRef<Record<string, { x: number; y: number; s: number }>>({});
   const kindRef = useRef<Record<string, 'intent' | 'ghost' | 'note'>>({});
   const stageRef = useRef<HTMLDivElement | null>(null);
   const { screenToFlowPosition, getViewport, setViewport, setCenter, zoomTo, fitView } = useReactFlow();
 
-  // 给自动化验证留的小门把手（无头浏览器控制视口用），不参与任何业务。
+  // A small handle for automated verification (headless browser viewport control); not part of any business logic.
   useEffect(() => {
     (window as unknown as Record<string, unknown>)['__canvas'] = { setCenter, zoomTo, fitView, getViewport };
   }, [setCenter, zoomTo, fitView, getViewport]);
 
-  // 数字键直达层级：0 全景，1–4 对应层级条。
+  // Number keys jump to levels: 0 overview, 1-4 match the level bar.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -122,7 +122,7 @@ export default function App() {
     } catch (e) { oops(e); }
   }, []);
 
-  // 开场：树、提议、布局；然后听着——服务端喊"变了"就再取。
+  // On load: tree, proposals, layout; then listen — refetch when the server says something changed.
   useEffect(() => {
     void (async () => {
       try {
@@ -135,7 +135,7 @@ export default function App() {
     return onChange(() => { void reload(); });
   }, [reload]);
 
-  /** 布局自动保存：每次改动 400ms 后落盘；页面要走时立刻冲刷（keepalive），不丢最后一手。 */
+  /** Layout autosave: persist 400ms after each change; flush immediately on unload (keepalive), never lose the last move. */
   const scheduleSave = useCallback(() => {
     if (saveTimer.current !== null) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
@@ -165,7 +165,7 @@ export default function App() {
     scheduleSave();
   }, [scheduleSave]);
 
-  /** 手调大小：s 也是布局（"字号表意"的另一半——事后还能改）。 */
+  /** Manual resize: s is also layout (the other half of size-as-semantics — adjustable afterwards). */
   const scaleNode = useCallback((id: string, s: number) => {
     if (kindRef.current[id] === 'note') {
       mutateLayout((l) => ({ ...l, notes: l.notes.map((n) => (n.id === id ? { ...n, s } : n)) }));
@@ -175,8 +175,8 @@ export default function App() {
     }
   }, [mutateLayout]);
 
-  // 滚轮提速：每格约 ×1.5（两格翻倍），指向光标缩放；Alt 精调；触控板捏合走同一条路。
-  // 默认的滚轮步长跨 0.05×→1× 要几十格——层与层离得远，步子必须大。
+  // Wheel acceleration: ~x1.5 per tick (double in two ticks), cursor-anchored zoom; Alt for fine control; trackpad pinch goes through the same path.
+  // Default wheel step needs dozens of ticks from 0.05x to 1x — levels are far apart, steps must be large.
   useEffect(() => {
     const el = stageRef.current;
     if (el === null) return;
@@ -185,7 +185,7 @@ export default function App() {
       if (t !== null && t.closest('.panel, .layerbar, textarea, input, select') !== null) return;
       e.preventDefault();
       e.stopPropagation();
-      // Shift+滚轮悬停在节点上 = 调这个节点的大小（布局的一部分），不动镜头。
+      // Shift+wheel hovering a node = resize that node (part of layout), camera untouched.
       if (e.shiftKey && t !== null) {
         const nodeEl = t.closest('.react-flow__node');
         const id = nodeEl instanceof HTMLElement ? nodeEl.getAttribute('data-id') : null;
@@ -223,14 +223,14 @@ export default function App() {
     }));
   }, [mutateLayout]);
 
-  /** 切换投影并记住：同一份真相，两种组织形式。 */
+  /** Switch projection and remember: same truth, two organizations. */
   const switchMode = useCallback((m: 'free' | 'timeline') => {
     setMode(m);
     mutateLayout((l) => ({ ...l, mode: m }));
     setTimeout(() => { void fitView({ padding: 0.15, duration: 350 }); }, 120);
   }, [mutateLayout, fitView]);
 
-  /** 原生连线：人画的关联批注，存布局，可删。 */
+  /** Native link: human-drawn relation annotation, stored in layout, deletable. */
   const addLink = useCallback((from: string, to: string) => {
     mutateLayout((l) => {
       const links = l.links ?? [];
@@ -239,7 +239,7 @@ export default function App() {
     });
   }, [mutateLayout]);
 
-  /** 拖线：两头都是真意图 → 问融合还是相关；沾着便签/幽灵 → 直接一条批注线。 */
+  /** Line drag: both ends real intents -> ask merge-or-related; touching a note/ghost -> a plain annotation line. */
   const onConnect = useCallback((c: Connection) => {
     if (c.source === null || c.target === null || c.source === c.target) return;
     if (kindRef.current[c.source] === 'intent' && kindRef.current[c.target] === 'intent') {
@@ -250,7 +250,7 @@ export default function App() {
     }
   }, [addLink]);
 
-  /** 幽灵实体化：认领=一句真话过人的门；有已认领的祖先就先"回到"它名下再认。 */
+  /** Ghost materialization: acceptance = a true utterance through the human gate; if an accepted ancestor exists, first resume under it, then accept. */
   const adoptGhost = useCallback(async (pid: string) => {
     if (tree === null) return;
     const byId = new Map(proposals.map((x) => [x.id, x]));
@@ -272,7 +272,7 @@ export default function App() {
       mutateLayout((l) => ({
         ...l,
         positions: { ...l.positions, [newId]: { x: pos.x, y: pos.y, ...(pos.s !== 1 ? { s: pos.s } : {}) } },
-        // 幽灵身上的批注线跟着实体化后的节点走，不断线。
+        // Annotation lines on a ghost follow the materialized node; no broken lines.
         links: (l.links ?? []).map((k) => ({
           ...k,
           from: k.from === pid ? newId : k.from,
@@ -283,7 +283,7 @@ export default function App() {
     } catch (e) { oops(e); }
   }, [tree, proposals, mutateLayout, reload]);
 
-  // 树（镜像）+ 提议（幽灵）+ 便签（原生）→ 画布。位置：人摆过的用人摆的，没摆过的给初始值。
+  // Tree (mirrors) + proposals (ghosts) + notes (native) -> canvas. Positions: human-placed where placed, initial values otherwise.
   useEffect(() => {
     if (tree === null || layout === null) return;
     const adoptedByProposal = new Map(
@@ -298,14 +298,14 @@ export default function App() {
     ];
     const auto = autoPlace(union, layout.positions);
 
-    // 时间轴投影：横轴 = 真实时间（底部年月日刻度），纵轴 = 意图线（每个根一条泳道，
-    // 便签一条底道）。投影是算出来的视图，不动自由布局里人摆的位置。
+    // Timeline projection: x = real time (date ticks at the bottom), y = intent lines (one swimlane per root,
+    // notes on a bottom lane). The projection is a computed view; it never moves human-placed positions in free layout.
     const unionById = new Map(union.map((u) => [u.id, u]));
     const timeOf = (id: string): number => {
       const k0 = tree.nodes.find((n) => n.id === id);
       if (k0 !== undefined) return Date.parse(k0.bornOf?.ts ?? k0.lastTouched);
       const g = proposals.find((p) => p.id === id);
-      if (g !== undefined) return Date.parse(g.at ?? g.ts);   // 幽灵优先用它所指之事的登记日期
+      if (g !== undefined) return Date.parse(g.at ?? g.ts);   // ghosts prefer the registration date of the thing they refer to
       const nt = layout.notes.find((n) => n.id === id);
       return nt?.t ?? Date.now();
     };
@@ -344,7 +344,7 @@ export default function App() {
       const rawX = (t: number): number => X0 + ((t - minT) / 86_400_000) * pxPerDay;
       const LANE_H = 170;
 
-      // 泳道内按时间排；同一天挤在一起时往右让位（保持时序，不叠牌）
+      // sorted by time within a swimlane; same-day items step right (order kept, no stacking)
       const byLane = new Map<number, string[]>();
       for (const id of allIds) {
         const l = laneOf(id);
@@ -364,7 +364,7 @@ export default function App() {
         }
       }
 
-      // 底部时间轴：按跨度选步长（1/2/7/14/30 天），首刻与跨年处带年份
+      // bottom timeline: step chosen by span (1/2/7/14/30 days), year shown on first tick and at year boundaries
       const laneCount = roots.length + (byLane.has(noteLane) ? 1 : 0);
       const axisY = 80 + laneCount * LANE_H + 20;
       const stepDays = days <= 16 ? 1 : days <= 32 ? 2 : days <= 112 ? 7 : days <= 224 ? 14 : 30;
@@ -380,7 +380,7 @@ export default function App() {
         ticks.push({ x: rawX(t), label });
       }
       const lanes = roots.map((r, i) => ({ y: 80 + i * LANE_H + 34, label: labelOf(r) }));
-      if (byLane.has(noteLane)) lanes.push({ y: 80 + noteLane * LANE_H + 34, label: '便签' });
+      if (byLane.has(noteLane)) lanes.push({ y: 80 + noteLane * LANE_H + 34, label: 'notes' });
       const lastTickX = ticks[ticks.length - 1]?.x ?? maxX;
       axisData = {
         x0: X0 - 60, top: 30, axisY, ticks, lanes,
@@ -450,7 +450,7 @@ export default function App() {
     });
     setNodes([...intentNodes, ...ghostNodes, ...noteNodes]);
 
-    // 开场视口：上次离开在哪儿，这次就在哪儿（视口也是布局）；从没存过才 fitView。
+    // Opening viewport: wherever you left off last time (viewport is layout too); fitView only if nothing stored.
     if (!initialViewDone.current) {
       initialViewDone.current = true;
       const vp = layout.viewport;
@@ -461,7 +461,7 @@ export default function App() {
     }
 
     const known = new Set([...union.map((u) => u.id), ...layout.notes.map((n) => n.id)]);
-    // 原生连线：人画的批注，黄点线，能删。
+    // Native link: human-drawn annotation, yellow dotted line, deletable.
     const linkEdges: Edge[] = (layout.links ?? [])
       .filter((k) => known.has(k.from) && known.has(k.to))
       .map((k) => ({
@@ -492,15 +492,15 @@ export default function App() {
         seen.add(key);
         merged.push({
           id: `m-${key}`, source: n.id < m ? n.id : m, target: n.id < m ? m : n.id,
-          style: { strokeDasharray: '6 4', opacity: 0.7 }, label: '一件事',
+          style: { strokeDasharray: '6 4', opacity: 0.7 }, label: 'same thing',
         });
       }
     }
     setEdges([...birth, ...ghostEdges, ...merged, ...linkEdges]);
   }, [tree, proposals, layout, mode, noteText, noteRemove, adoptGhost, scaleNode, setNodes, setViewport, fitView]);
 
-  // 拖完，位置归档（保留尺度）——这是画布唯一"写"的东西之一。
-  // 时间轴是投影（位置是算出来的），不落盘。
+  // After drag, position is archived (scale preserved) — one of the few things the canvas writes.
+  // Timeline is a projection (positions computed), never persisted.
   const onDragStop: OnNodeDrag<CanvasNode> = useCallback((_e, node) => {
     if (mode !== 'free') return;
     if (node.type === 'note') {
@@ -525,15 +525,15 @@ export default function App() {
     }
   }, [mutateLayout, mode]);
 
-  /** 删除键：只删得动原生的。出生边/融合边是痕迹的投影，意图不是删除键能删的。 */
+  /** Delete key: only native things can be deleted. Birth/merge edges are projections of traces; intents are not deletable by key. */
   const onEdgesDelete = useCallback((deleted: Edge[]) => {
     const native = deleted.filter((e) => e.id.startsWith('l-')).map((e) => e.id.slice(2));
     if (native.length > 0) {
       mutateLayout((l) => ({ ...l, links: (l.links ?? []).filter((k) => !native.includes(k.id)) }));
     }
     if (deleted.some((e) => !e.id.startsWith('l-'))) {
-      oops('出生边/融合边是痕迹的投影，画布上删不掉');
-      void reload();                       // 立刻把被视觉上摘掉的真相边放回来
+      oops('birth/merge edges are trace projections, cannot be deleted on the canvas');
+      void reload();                       // immediately restore the truth edge that was visually removed
     }
   }, [mutateLayout, reload]);
 
@@ -541,7 +541,7 @@ export default function App() {
     const notes = deleted.filter((n) => n.type === 'note').map((n) => n.id);
     for (const id of notes) noteRemove(id);
     if (deleted.some((n) => n.type === 'intent')) {
-      oops('意图不是删除键能删的——用「不做了」，理由会进痕迹');
+      oops('intents cannot be deleted by key — use drop, the reason goes into traces');
     }
   }, [noteRemove]);
 
@@ -550,7 +550,7 @@ export default function App() {
     setWhyText('');
   }, []);
 
-  /** 双击一个东西 = 跳到它的层级：缩放到 1/s（它的字回到基准大小）并居中。 */
+  /** Double-click a thing = jump to its level: zoom to 1/s (its text returns to base size) and center. */
   const onNodeDoubleClick: NodeMouseHandler<CanvasNode> = useCallback((_e, node) => {
     const s = 's' in node.data ? node.data.s : 1;
     const w = node.measured?.width ?? 200;
@@ -570,7 +570,7 @@ export default function App() {
     }));
   }, [mutateLayout, screenToFlowPosition, getViewport]);
 
-  /** 顶栏认领：落在视野中心，尺度=当下的缩放层面。 */
+  /** Top-bar claim: lands at view center, scale = current zoom level. */
   const adoptHere = useCallback(async (text: string) => {
     const s = clampScale(1 / getViewport().zoom);
     const c = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight * 0.45 });
@@ -598,14 +598,14 @@ export default function App() {
       if ((e.target as HTMLElement).classList.contains('react-flow__pane')) addNoteAt(e.clientX, e.clientY);
     }}>
       <header>
-        <span className="brand">Theseus · 画布</span>
-        <span className="line" title="从当前沿出生边走到根">{tree?.line ?? '…'}</span>
+        <span className="brand">Theseus · Canvas</span>
+        <span className="line" title="walk from current to root along birth edges">{tree?.line ?? '…'}</span>
         <span className="ghost-count dim">
-          {proposals.length > 0 ? `幽灵 ${proposals.length} 条待认领` : ''}
+          {proposals.length > 0 ? `${proposals.length} ghost proposal${proposals.length > 1 ? 's' : ''} awaiting acceptance` : ''}
         </span>
         <span className="mode-toggle">
-          <button className={mode === 'free' ? 'here' : ''} onClick={() => switchMode('free')}>自由</button>
-          <button className={mode === 'timeline' ? 'here' : ''} onClick={() => switchMode('timeline')}>时间轴</button>
+          <button className={mode === 'free' ? 'here' : ''} onClick={() => switchMode('free')}>free</button>
+          <button className={mode === 'timeline' ? 'here' : ''} onClick={() => switchMode('timeline')}>timeline</button>
         </span>
         <form className="say" onSubmit={(e) => {
           e.preventDefault();
@@ -617,9 +617,9 @@ export default function App() {
           <input
             value={sayText}
             onChange={(e) => setSayText(e.target.value)}
-            placeholder="说一句，认领一条意图（挂在当前之下，落在视野中心）…"
+            placeholder="say something to claim an intent (child of current, lands at view center)..."
           />
-          <button type="submit">认领</button>
+          <button type="submit">claim</button>
         </form>
       </header>
 
@@ -692,9 +692,9 @@ export default function App() {
 
         {tree !== null && tree.nodes.length === 0 && proposals.length === 0 && (
           <div className="empty">
-            <p>树还是空的。</p>
-            <p>在上面说一句——比如「把画布做出来」——认领你的第一条意图。</p>
-            <p className="dim">双击空白处可以贴一张便签（便签只活在布局里，不进痕迹）。</p>
+            <p>The tree is empty.</p>
+            <p>Say something above — e.g. “build the canvas” — to claim your first intent.</p>
+            <p className="dim">Double-click empty space to pin a note (notes live in layout only, never in traces).</p>
           </div>
         )}
 
@@ -702,47 +702,47 @@ export default function App() {
           <aside className="panel">
             <div className="p-saying">{selected.saying}</div>
             <div className="p-row">
-              状态：{selected.status === 'open' ? '悬着' : selected.status === 'done' ? '做完了' : '不做了'}
-              {tree?.current === selected.id ? '（当前）' : ''}
+              status: {selected.status === 'open' ? 'open' : selected.status === 'done' ? 'done' : 'dropped'}
+              {tree?.current === selected.id ? '(current)' : ''}
             </div>
             {selected.bornOf !== null && (
               <div className="p-born">
-                <div className="dim">出生的那句话（{selected.bornOf.ts.slice(0, 16).replace('T', ' ')}）：</div>
+                <div className="dim">The utterance it was born of ({selected.bornOf.ts.slice(0, 16).replace('T', ' ')}）：</div>
                 <blockquote>{selected.bornOf.text}</blockquote>
               </div>
             )}
             {selected.mergedWith.length > 0 && (
-              <div className="p-row dim">已与 {selected.mergedWith.length} 条并为一件事</div>
+              <div className="p-row dim">merged with {selected.mergedWith.length} other intent(s)</div>
             )}
             <div className="p-actions">
-              <button onClick={() => void doAct('resume', { target: selected.id })}>回到这儿</button>
-              <button onClick={() => void doAct('done', { target: selected.id })}>做完了</button>
+              <button onClick={() => void doAct('resume', { target: selected.id })}>resume here</button>
+              <button onClick={() => void doAct('done', { target: selected.id })}>mark done</button>
             </div>
             <div className="p-drop">
               <input
                 value={whyText}
                 onChange={(e) => setWhyText(e.target.value)}
-                placeholder="不做了？先写一句为什么…"
+                placeholder="dropping it? say why first..."
               />
               <button
                 disabled={whyText.trim() === ''}
                 onClick={() => { void doAct('drop', { target: selected.id, why: whyText.trim() }); setWhyText(''); }}
-              >不做了</button>
+              >drop</button>
             </div>
-            <button className="p-close" onClick={() => setSelectedId(null)}>关</button>
+            <button className="p-close" onClick={() => setSelectedId(null)}>close</button>
           </aside>
         )}
 
         {pendingConnect !== null && (
           <div className="connect-ask">
             <div className="ca-title">
-              把「{tree?.nodes.find((n) => n.id === pendingConnect.a)?.saying ?? '…'}」
-              和「{tree?.nodes.find((n) => n.id === pendingConnect.b)?.saying ?? '…'}」连起来——
+              Connect “{tree?.nodes.find((n) => n.id === pendingConnect.a)?.saying ?? '...'}”
+              and “{tree?.nodes.find((n) => n.id === pendingConnect.b)?.saying ?? '...'}” —
             </div>
             <input
               value={mergeWhy}
               onChange={(e) => setMergeWhy(e.target.value)}
-              placeholder="要是融合，说一句为什么是一件事（可选）…"
+              placeholder="if merging, say why they are one thing (optional)..."
             />
             <div className="ca-actions">
               <button onClick={() => {
@@ -754,11 +754,11 @@ export default function App() {
                     await reload();
                   } catch (e) { oops(e); }
                 })();
-              }}>是一件事（融合，进痕迹）</button>
+              }}>same thing (merge, into traces)</button>
               <button onClick={() => { addLink(pendingConnect.a, pendingConnect.b); setPendingConnect(null); }}>
-                只是相关（画条线，仅布局）
+                just related (draw a link, layout only)
               </button>
-              <button className="ca-cancel" onClick={() => setPendingConnect(null)}>算了</button>
+              <button className="ca-cancel" onClick={() => setPendingConnect(null)}>cancel</button>
             </div>
           </div>
         )}

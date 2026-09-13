@@ -1,17 +1,17 @@
 /**
- * 画布的服务端：Node 内建 http 上的一层薄适配器，零框架。
+ * Canvas server: a thin adapter over Node's built-in http, zero frameworks.
  *
- * 它只做四件事，每件都薄：
+ * It does exactly four things, each thin:
  *
- *  1. 把折叠出来的意图树原样交给前端（GET /api/tree）。树没有第二份存储——
- *     每次都从痕迹现场折叠（src/intent.ts），画布上看到的就是真的（U32）。
- *  2. 存人摆的位置和写的便签（GET/PUT /api/layout）。照维度透镜那次的教训：
- *     **布局里只许有位置、便签、视口，运行真相字段一个也进不来**，
- *     认不出的字段当场拒、点名。镜像归真相，原生归我。
- *  3. 替面板开人的门（POST /api/act）。面板是人的门之一（design/intent.md 2.3）：
- *     点按钮就是开口——落一条 `canvas.said`（user:human:canvas），
- *     再由 `tool:canvas` 走 agent 的门写意图痕迹。判据原样生效，画布上不再造一道。
- *  4. 有变化就喊一声（GET /api/events，SSE）。前端听到了自己来取，服务端不推数据。
+ *  1. Hand the folded intent tree to the frontend as-is (GET /api/tree). The tree has no second storage —
+ *     folded from traces on every request (src/intent.ts); what the canvas shows is the truth (U32).
+ *  2. Store human-placed positions and notes (GET/PUT /api/layout). Lesson from the dimension-lens incident:
+ *     **layout may only hold position, notes, viewport — no runtime-truth fields may enter**,
+ *     unknown fields are rejected on the spot and named. Mirrors belong to truth; natives belong to me.
+ *  3. Open the human gate for the panel (POST /api/act). The panel is one of the human gates (design/intent.md 2.3):
+ *     clicking a button is speaking — records a `canvas.said` (user:human:canvas),
+ *     then `tool:canvas` writes intent traces through the agent gate. Criteria apply as-is; no second gate is invented on the canvas.
+ *  4. Announce changes (GET /api/events, SSE). The frontend fetches on hearing; the server never pushes data.
  */
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -33,57 +33,57 @@ const trace = new Trace(DB);
 const intent = new Intent(trace, `tool:canvas:${process.pid}`);
 const human = humanDoor(trace);
 
-/** 布局这道门拒了。理由必须说得出来。 */
+/** The layout gate refused. The reason must be stateable. */
 class LayoutRefused extends Error {
   override readonly name = 'LayoutRefused';
 }
 
-// ─────────────────────────────── 布局：只有位置、便签、视口 ───────────────────────────────
+// ─────────────────────────────── layout: only position, notes, viewport ───────────────────────────────
 
-// `s` 是创建时的缩放尺度（世界尺寸倍率）：缩得远建的东西大，凑近建的小——
-// 大小本身是人赋予的语义（2021 年那句"字号表意，但我不想知道字号是多少"）。
+// `s` is the zoom scale at creation (world-size multiplier): things created zoomed-out are large, zoomed-in small —
+// size itself is human-given semantics (2021: “font size expresses meaning, but I don't want to know the number”).
 interface Note { id: string; x: number; y: number; w?: number; h?: number; s?: number; t?: number; text: string }
-/** 原生连线：人画的关联，只是批注——和出生边/融合边（痕迹的投影）不是一个东西。 */
+/** Native link: human-drawn relation, mere annotation — a different thing from birth/merge edges (trace projections). */
 interface Link { id: string; from: string; to: string; label?: string }
 interface Layout {
   positions: Record<string, { x: number; y: number; s?: number }>;
   notes: Note[];
   links?: Link[];
-  /** 视图投影：自由布局 / 时间轴。同一份真相，多种组织形式。 */
+  /** View projection: free layout / timeline. Same truth, multiple organizations. */
   mode?: 'free' | 'timeline';
   viewport?: { x: number; y: number; zoom: number };
 }
 
 const aNumber = (v: unknown, at: string): number => {
-  if (typeof v !== 'number' || !Number.isFinite(v)) throw new LayoutRefused(`${at} 不是一个有限的数`);
+  if (typeof v !== 'number' || !Number.isFinite(v)) throw new LayoutRefused(`${at} is not a finite number`);
   return v;
 };
 const aString = (v: unknown, at: string): string => {
-  if (typeof v !== 'string') throw new LayoutRefused(`${at} 不是字符串`);
+  if (typeof v !== 'string') throw new LayoutRefused(`${at} is not a string`);
   return v;
 };
 const onlyKeys = (o: object, allowed: readonly string[], at: string): void => {
   for (const k of Object.keys(o)) {
     if (!allowed.includes(k)) {
-      throw new LayoutRefused(`${at} 里不认识的字段 '${k}' —— 运行真相不进布局，布局里只有位置和我写的东西`);
+      throw new LayoutRefused(`${at} unknown field in '${k}'  — runtime truth does not enter layout; layout holds only positions and what I wrote`);
     }
   }
 };
 
-/** 递归核对整份布局。认不出的字段当场拒——这不是防御性编程，是 U32 的边界本身。 */
+/** Recursively validate the whole layout. Unknown fields are rejected on the spot — not defensive programming, but the U32 boundary itself. */
 function checkLayout(raw: unknown): Layout {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    throw new LayoutRefused('布局必须是一个对象');
+    throw new LayoutRefused('layout must be an object');
   }
-  onlyKeys(raw, ['positions', 'notes', 'links', 'mode', 'viewport'], '布局');
+  onlyKeys(raw, ['positions', 'notes', 'links', 'mode', 'viewport'], 'layout');
   const r = raw as Record<string, unknown>;
 
   const positions: Layout['positions'] = {};
   if (r['positions'] !== undefined) {
     const p = r['positions'];
-    if (typeof p !== 'object' || p === null || Array.isArray(p)) throw new LayoutRefused('positions 必须是对象');
+    if (typeof p !== 'object' || p === null || Array.isArray(p)) throw new LayoutRefused('positions must be an object');
     for (const [id, pos] of Object.entries(p)) {
-      if (typeof pos !== 'object' || pos === null) throw new LayoutRefused(`positions['${id}'] 必须是对象`);
+      if (typeof pos !== 'object' || pos === null) throw new LayoutRefused(`positions['${id}'] must be an object`);
       onlyKeys(pos, ['x', 'y', 's'], `positions['${id}']`);
       const q = pos as Record<string, unknown>;
       positions[id] = { x: aNumber(q['x'], `positions['${id}'].x`), y: aNumber(q['y'], `positions['${id}'].y`) };
@@ -93,9 +93,9 @@ function checkLayout(raw: unknown): Layout {
 
   const notes: Note[] = [];
   if (r['notes'] !== undefined) {
-    if (!Array.isArray(r['notes'])) throw new LayoutRefused('notes 必须是数组');
+    if (!Array.isArray(r['notes'])) throw new LayoutRefused('notes must be an array');
     for (const [i, n] of (r['notes'] as unknown[]).entries()) {
-      if (typeof n !== 'object' || n === null) throw new LayoutRefused(`notes[${i}] 必须是对象`);
+      if (typeof n !== 'object' || n === null) throw new LayoutRefused(`notes[${i}] must be an object`);
       onlyKeys(n, ['id', 'x', 'y', 'w', 'h', 's', 't', 'text'], `notes[${i}]`);
       const q = n as Record<string, unknown>;
       const note: Note = {
@@ -114,14 +114,14 @@ function checkLayout(raw: unknown): Layout {
 
   const out: Layout = { positions, notes };
   if (r['mode'] !== undefined) {
-    if (r['mode'] !== 'free' && r['mode'] !== 'timeline') throw new LayoutRefused(`mode 只认 free / timeline`);
+    if (r['mode'] !== 'free' && r['mode'] !== 'timeline') throw new LayoutRefused(`mode only free / timeline allowed`);
     out.mode = r['mode'];
   }
   if (r['links'] !== undefined) {
-    if (!Array.isArray(r['links'])) throw new LayoutRefused('links 必须是数组');
+    if (!Array.isArray(r['links'])) throw new LayoutRefused('links must be an array');
     const links: Link[] = [];
     for (const [i, k] of (r['links'] as unknown[]).entries()) {
-      if (typeof k !== 'object' || k === null) throw new LayoutRefused(`links[${i}] 必须是对象`);
+      if (typeof k !== 'object' || k === null) throw new LayoutRefused(`links[${i}] must be an object`);
       onlyKeys(k, ['id', 'from', 'to', 'label'], `links[${i}]`);
       const q = k as Record<string, unknown>;
       const link: Link = {
@@ -136,7 +136,7 @@ function checkLayout(raw: unknown): Layout {
   }
   if (r['viewport'] !== undefined) {
     const v = r['viewport'];
-    if (typeof v !== 'object' || v === null) throw new LayoutRefused('viewport 必须是对象');
+    if (typeof v !== 'object' || v === null) throw new LayoutRefused('viewport must be an object');
     onlyKeys(v, ['x', 'y', 'zoom'], 'viewport');
     const q = v as Record<string, unknown>;
     out.viewport = { x: aNumber(q['x'], 'viewport.x'), y: aNumber(q['y'], 'viewport.y'), zoom: aNumber(q['zoom'], 'viewport.zoom') };
@@ -148,24 +148,24 @@ async function readLayout(): Promise<Layout> {
   try {
     return checkLayout(JSON.parse(await readFile(LAYOUT, 'utf8')));
   } catch {
-    return { positions: {}, notes: [] };  // 没有或坏了：从空布局开始。真相无损，丢的只是摆法。
+    return { positions: {}, notes: [] };  // missing or broken: start from an empty layout. Truth is unharmed; only the arrangement is lost.
   }
 }
 
-/** 写布局：先写旁边再换名，别让一次断电留下半份。 */
+/** Write layout: write beside then rename, so a power cut never leaves half a file. */
 async function writeLayout(l: Layout): Promise<void> {
   const tmp = `${LAYOUT}.tmp-${process.pid}`;
   await writeFile(tmp, JSON.stringify(l, null, 1));
   await rename(tmp, LAYOUT);
 }
 
-// ─────────────────────────────── 树：现场折叠，原样交出 ───────────────────────────────
+// ─────────────────────────────── tree: folded on demand, handed over as-is ───────────────────────────────
 
 interface TreeNodeOut {
   id: string; saying: string; parent: string | null;
   status: 'open' | 'done' | 'dropped'; mergedWith: readonly string[]; lastTouched: string;
   bornOf: { id: string; text: string; ts: string } | null;
-  /** 认下的是哪条提议（幽灵实体化之后，前端靠它接上幽灵树的边）。 */
+  /** Which proposal was accepted (after ghost materialization, the frontend uses it to reconnect ghost-tree edges). */
   fromProposal: string | null;
 }
 
@@ -185,12 +185,12 @@ function treeJson(): { current: string | null; line: string; nodes: TreeNodeOut[
 }
 
 /**
- * 还没被回应的提议（agent 提的、树上不算数的那些）。前端把它们画成幽灵树。
- * "被回应"只认树的动词——提议之间的引用（父子）不算回应。
+ * Proposals not yet answered (agent-proposed, not counted on the tree). The frontend renders them as a ghost tree.
+ * “Answered” only counts tree verbs — references between proposals (parent/child) do not count as answers.
  *
- * 同一条猜测被提过多遍（比如带着更全的信息重提）时，只露最新的一遍：
- * 按「父文本|文本」去重、保最大号——而且去重在"被回应"过滤**之前**做，
- * 这样新的一遍被认领后，旧的一遍不会又冒出来。
+ * When the same guess was proposed multiple times (e.g. re-proposed with fuller information), only the latest is shown:
+ * dedup by parent-text|text keeping the highest number — and dedup happens **before** the answered-filter,
+ * so after the latest is accepted, the old one does not reappear.
  */
 function proposalsJson(): { id: string; text: string; at: string | null; ts: string; parent: string | null }[] {
   const all = trace.ofType('intent.proposed').map((p) => ({
@@ -214,12 +214,12 @@ function proposalsJson(): { id: string; text: string; at: string | null; ts: str
     .sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
-// ─────────────────────────────── 动作：面板是人的门 ───────────────────────────────
+// ─────────────────────────────── actions: the panel is a human gate ───────────────────────────────
 
 /**
- * 点按钮就是开口。那句话先原样落进痕迹（canvas.said，人的门），
- * 意图痕迹再挂在它上面（tool:canvas，agent 的门）。动作被拒时那句话留着——
- * 我确实说了，只是这次没算数，这本身就是诚实的历史。
+ * Clicking a button is speaking. The utterance is recorded verbatim into traces first (canvas.said, human gate),
+ * then intent traces attach to it (tool:canvas, agent gate). If the action is refused the utterance stays —
+ * I did say it; it just did not count this time — which is itself honest history.
  */
 function act(b: Record<string, unknown>): { id: string } {
   const say = (text: string) => human.record({
@@ -231,39 +231,39 @@ function act(b: Record<string, unknown>): { id: string } {
 
   if (kind === 'adopt') {
     const text = String(b['text'] ?? '').trim();
-    if (text === '') throw new IntentRefused('一个节点是一句话——空的说法长不成节点');
+    if (text === '') throw new IntentRefused('a node is an utterance — an empty saying cannot grow into a node');
     const accepting = typeof b['accepting'] === 'string' ? b['accepting'] : undefined;
     const under = typeof b['under'] === 'string' ? b['under'] : undefined;
-    // 认在指定的老节点下：同一句话既是"回去"的授权也是"认领"的授权——
-    // 两条痕迹都直接挂在它上面，判据一条不松（design/intent.md 1.4：要挂到老节点上，先回去）。
-    const h = say(under !== undefined && under !== intent.tree().current ? `回到「${sayingOf(under)}」，认领：${text}` : text);
+    // Accept under a specified old node: the same utterance authorizes both the resume and the acceptance —
+    // both traces hang directly on it, not one criterion loosened (design/intent.md 1.4: to hang on an old node, first go back).
+    const h = say(under !== undefined && under !== intent.tree().current ? `resume at '${sayingOf(under)}', accept: ${text}` : text);
     if (under !== undefined && under !== intent.tree().current) {
       intent.resume({ said: h.id, node: under });
     }
     return { id: intent.adopt({ said: h.id, text, ...(accepting !== undefined ? { accepting } : {}) }).id };
   }
   if (kind === 'resume') {
-    return { id: intent.resume({ said: say(`回到：${sayingOf(target)}`).id, node: target }).id };
+    return { id: intent.resume({ said: say(`resume: ${sayingOf(target)}`).id, node: target }).id };
   }
   if (kind === 'done') {
-    return { id: intent.done({ said: say(`做完了：${sayingOf(target)}`).id, target }).id };
+    return { id: intent.done({ said: say(`done: ${sayingOf(target)}`).id, target }).id };
   }
   if (kind === 'drop') {
     const why = String(b['why'] ?? '').trim();
-    if (why === '') throw new IntentRefused('没有为什么。放弃的理由是将来"要不要捡回来"的唯一依据');
-    return { id: intent.drop({ said: say(`不做了：${sayingOf(target)}——${why}`).id, target, why }).id };
+    if (why === '') throw new IntentRefused('no why given. The drop reason is the only basis for deciding whether to pick it back up later');
+    return { id: intent.drop({ said: say(`drop: ${sayingOf(target)} — ${why}`).id, target, why }).id };
   }
   if (kind === 'merge') {
     const a = String(b['a'] ?? '');
     const bb = String(b['b'] ?? '');
     const why = String(b['why'] ?? '').trim();
-    const h = say(`这俩是一件事：「${sayingOf(a)}」和「${sayingOf(bb)}」${why !== '' ? `——${why}` : ''}`);
+    const h = say(`same thing: '${sayingOf(a)}' and '${sayingOf(bb)}'${why !== '' ? ` — ${why}` : ''}`);
     return { id: intent.merge({ said: h.id, a, b: bb, ...(why !== '' ? { why } : {}) }).id };
   }
-  throw new IntentRefused(`不认识的动作 '${kind}'`);
+  throw new IntentRefused(`unknown action '${kind}'`);
 }
 
-// ─────────────────────────────── 有变化喊一声（SSE） ───────────────────────────────
+// ─────────────────────────────── announce changes (SSE) ───────────────────────────────
 
 const listeners = new Set<ServerResponse>();
 let lastHash = '';
@@ -298,7 +298,7 @@ async function body(req: IncomingMessage): Promise<unknown> {
   let size = 0;
   for await (const c of req) {
     size += (c as Buffer).length;
-    if (size > 1 << 20) throw new LayoutRefused('请求超过 1MB');
+    if (size > 1 << 20) throw new LayoutRefused('request exceeds 1MB');
     chunks.push(c as Buffer);
   }
   const text = Buffer.concat(chunks).toString('utf8');
@@ -311,12 +311,12 @@ async function serveStatic(path: string, res: ServerResponse): Promise<void> {
   if (!file.startsWith(DIST)) { json(res, 404, { error: 'not found' }); return; }
   const target = existsSync(file) ? file : join(DIST, 'index.html');
   if (!existsSync(target)) {
-    json(res, 200, { hint: '前端还没构建：pnpm -C canvas build' });
+    json(res, 200, { hint: 'frontend not built yet: pnpm -C canvas build' });
     return;
   }
   res.writeHead(200, {
     'content-type': MIME[extname(target)] ?? 'application/octet-stream',
-    'cache-control': 'no-store',  // 开发节奏优先：重发了就要看到新的（占城 dev 站同款教训）
+    'cache-control': 'no-store',  // dev-rhythm first: a reload must show the new thing (same lesson as the conquest dev site)
   });
   res.end(await readFile(target));
 }
@@ -351,7 +351,7 @@ createServer(async (req, res) => {
     if (e instanceof IntentRefused || e instanceof TraceRefused || e instanceof LayoutRefused) {
       return json(res, 400, { error: `${(e as Error).name}: ${(e as Error).message}` });
     }
-    if (e instanceof SyntaxError) return json(res, 400, { error: `不是合法的 JSON: ${e.message}` });
+    if (e instanceof SyntaxError) return json(res, 400, { error: `invalid JSON: ${e.message}` });
     console.error(e);
     json(res, 500, { error: (e as Error).message });
   }

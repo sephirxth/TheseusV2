@@ -1,5 +1,5 @@
-// 没被人摆过的东西，给一个确定性的初始位置：整齐树（叶子占行、父亲居中于子树、
-// 根与根之间留空）。只是初始值——人一拖，位置就归人（U31），这里再也不碰它。
+// Things never placed by a human get a deterministic initial position: a tidy tree (leaves on rows, parents centered over subtrees,
+// gaps between roots). Initial value only — once a human drags, the position belongs to the human (U31); this code never touches it again.
 
 export interface Placeable { id: string; parent: string | null }
 
@@ -27,7 +27,7 @@ export function autoPlace(
   const out: Record<string, { x: number; y: number }> = {};
   let row = 0;
   const visit = (n: Placeable, depth: number, seen: Set<string>): number => {
-    if (seen.has(n.id)) return row;          // 防御：数据里出现环也不至于转死
+    if (seen.has(n.id)) return row;          // guard: cycles in data cannot loop forever
     seen.add(n.id);
     const children = kids.get(n.id) ?? [];
     let y: number;

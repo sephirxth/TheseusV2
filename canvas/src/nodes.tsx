@@ -16,7 +16,7 @@ function useScaleDrag(id: string, s: number, onScale: (id: string, s: number) =>
 
   const grip = {
     className: 'resize-grip nodrag',
-    title: '拖动调大小（Shift+滚轮也行）',
+    title: 'drag to resize (Shift+wheel works too)',
     onPointerDown: (e: RPointerEvent<HTMLDivElement>) => {
       e.stopPropagation();
       e.preventDefault();
@@ -52,12 +52,12 @@ export type IntentFlowNode = Node<{
   mergedCount: number;
   bornText: string;
   s: number;
-  /** 时间属性（出生那句话的时刻）；时间轴投影下显示。 */
+  /** Time property (the moment of the birth utterance); shown in timeline projection. */
   date?: string;
   onScale: (id: string, s: number) => void;
 }, 'intent'>;
 
-/** 镜像节点：树上的一条意图。数据活在痕迹里，这儿只负责长得像它。 */
+/** Mirror node: one intent on the tree. Data lives in traces; this only renders it. */
 export function IntentNodeView({ id, data, selected }: NodeProps<IntentFlowNode>) {
   const { scale, grip } = useScaleDrag(id, data.s, data.onScale);
   return (
@@ -70,9 +70,9 @@ export function IntentNodeView({ id, data, selected }: NodeProps<IntentFlowNode>
         {data.status === 'done' ? '✓ ' : ''}{data.saying}
       </div>
       <div className="meta">
-        {data.isCurrent ? <span className="tag-current">当前</span> : null}
-        {data.status === 'dropped' ? <span className="tag-dropped">不做了</span> : null}
-        {data.mergedCount > 0 ? <span className="tag-merged">已并 {data.mergedCount}</span> : null}
+        {data.isCurrent ? <span className="tag-current">current</span> : null}
+        {data.status === 'dropped' ? <span className="tag-dropped">dropped</span> : null}
+        {data.mergedCount > 0 ? <span className="tag-merged">merged {data.mergedCount}</span> : null}
         {data.date !== undefined ? <span className="tag-date">{data.date}</span> : null}
       </div>
       <div {...grip} />
@@ -90,18 +90,18 @@ export type GhostFlowNode = Node<{
   onScale: (id: string, s: number) => void;
 }, 'ghost'>;
 
-/** 幽灵节点：agent 提的，树上不算数。认了那一下才是授权，节点就在原位实体化。 */
+/** Ghost node: agent-proposed, not counted on the tree. The acceptance click is the authorization; the node materializes in place. */
 export function GhostNodeView({ id, data }: NodeProps<GhostFlowNode>) {
   const { scale, grip } = useScaleDrag(id, data.s, data.onScale);
   return (
     <div className={`ghost-node${data.suspended ? ' suspended' : ''}`} style={{ fontSize: `${14 * scale}px` }}>
       <Handle type="target" position={Position.Left} />
       <div className="g-chip">
-        [意图·猜的]{data.suspended ? ' ⏸' : ''}
+        [intent·guess]{data.suspended ? ' ⏸' : ''}
         {data.date !== undefined ? <span className="tag-date">{data.date}</span> : null}
       </div>
       <div className="saying">{data.text}</div>
-      <button className="g-adopt nodrag" onClick={() => data.onAdopt(id)}>认领</button>
+      <button className="g-adopt nodrag" onClick={() => data.onAdopt(id)}>accept</button>
       <div {...grip} />
       <Handle type="source" position={Position.Right} />
     </div>
@@ -117,18 +117,18 @@ export type NoteFlowNode = Node<{
   onScale: (id: string, s: number) => void;
 }, 'note'>;
 
-/** 原生节点：便签。它只活在布局里——画布坏了，丢的是它，不是任何事实。
- *  也有连接点：便签连到谁身上，是一条原生关联（批注），不是树的边。 */
+/** Native node: a note. It lives in layout only — if the canvas breaks, what is lost is it, never any fact.
+ *  It also has connection points: a note attached to something is a native relation (annotation), not a tree edge. */
 export function NoteNodeView({ id, data }: NodeProps<NoteFlowNode>) {
   const { scale, grip } = useScaleDrag(id, data.s, data.onScale);
   return (
     <div className="note-node" style={{ fontSize: `${13 * scale}px` }}>
       <Handle type="target" position={Position.Left} />
-      <button className="note-x nodrag" title="删掉这张便签" onClick={() => data.onRemove(id)}>×</button>
+      <button className="note-x nodrag" title="delete this note" onClick={() => data.onRemove(id)}>×</button>
       <textarea
         className="nodrag"
         defaultValue={data.text}
-        placeholder="写点什么…"
+        placeholder="write something..."
         onBlur={(e) => data.onText(id, e.target.value)}
       />
       {data.date !== undefined ? <div className="note-date">{data.date}</div> : null}
