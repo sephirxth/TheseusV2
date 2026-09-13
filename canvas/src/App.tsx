@@ -18,7 +18,7 @@ const nodeTypes = { intent: IntentNodeView, ghost: GhostNodeView, note: NoteNode
 
 const isSuspended = (t: string): boolean => / ⏸$/u.test(t);
 const cleanText = (t: string): string => t.replace(/ ⏸$/u, '');
-/** 创建时的世界尺度 = 1/当时的缩放，夹在可读范围里。 */
+/** World scale at creation = 1 / zoom at that moment, clamped to readable range. */
 const clampScale = (v: number): number => Math.min(10, Math.max(0.35, v));
 
 const MIN_ZOOM = 0.05;
@@ -29,7 +29,7 @@ const fmtDate = (ms: number): string => {
   return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-/** 时间轴投影的轴：底部年月日刻度 + 每条意图线一条泳道导线。 */
+/** Timeline projection axis: date ticks at the bottom + one swimlane guide per intent line. */
 interface AxisData {
   x0: number;
   width: number;
@@ -39,7 +39,7 @@ interface AxisData {
   lanes: { y: number; label: string }[];
 }
 
-/** 层级条：全景 + 四个常驻层（数字键 0–4 直达），顺带显示现在在第几层。 */
+/** Level bar: overview + four persistent levels (keys 0-4 jump directly), also shows the current level. */
 const LAYERS: { key: string; label: string; zoom: number }[] = [
   { key: '1', label: '大局 0.1×', zoom: 0.1 },
   { key: '2', label: '中景 0.3×', zoom: 0.3 },

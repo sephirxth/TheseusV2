@@ -1,13 +1,13 @@
-// 三类节点，组件表就是类型注册表：镜像（意图）、幽灵（提议）、原生（便签）。
-// 尺度：字号 = 基准 × s，其余尺寸全用 em 跟着走。s 来自创建时的缩放层面，
-// 也可以事后手调（右下角柄 / Shift+滚轮）——大小是人赋予的语义，布局的一部分。
+// Three node kinds; the component table is the type registry: mirror (intent), ghost (proposal), native (note).
+// Scale: font size = base x s, all other sizes follow via em. s comes from the zoom level at creation,
+// and can be adjusted afterwards (bottom-right handle / Shift+wheel) — size is human-given semantics, part of the layout.
 
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 
 const clampS = (v: number): number => Math.min(10, Math.max(0.35, v));
 
-/** 右下角柄：拖动改 s。拖中本地实时预览，松手才归档（onScale）。 */
+/** Bottom-right handle: drag to change s. Live local preview while dragging; archives on release (onScale). */
 function useScaleDrag(id: string, s: number, onScale: (id: string, s: number) => void) {
   const [live, setLive] = useState<number | null>(null);
   const start = useRef<{ x0: number; s0: number; w0: number } | null>(null);
