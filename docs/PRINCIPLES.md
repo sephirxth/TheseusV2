@@ -1,36 +1,27 @@
-# 第一原则：先找成熟解法，再考虑自己造
+# First Principle: Find the Mature Solution Before Building Your Own
 
-> 2026-08-09 游渊：「TheseusV2 能用经典可靠鲁棒的方法就用，有什么问题先想想是不是这类问题的本质已经有成熟解决方法了，**这个系统应该只有极少部分值得创新**。」
+> 2026-08-09, the owner: "TheseusV2 should use classic, reliable, robust methods wherever they exist. When a problem appears, first ask whether the essence of this problem class already has a mature solution. **This system should contain only the parts that genuinely have no existing answer.**"
 
-**做法**：碰到一个问题，先问一句——**这类问题的本质，人类是不是已经解决过了？**
-找到了就用，并在设计文档里写出**用的是谁的做法**。
-找不到，再自己造；**自己造的每一处都要单独标出来**，因为那是这个系统里最贵、最容易错的部分。
+**Practice**: when facing a problem, ask first — **has humanity already solved the essence of this problem class?**
+If yes, use it, and name the source in the design document.
+If no, build it yourself; and **mark every self-built piece explicitly**, because those are the most expensive, most error-prone parts of the system.
 
----
+## It Has Already Won Four Times
 
-## 它已经赢过四次
+This is not a new rule — it is the pattern where **every time it was followed the project won, every time it was ignored the project bled.**
 
-这条原则不是新要求，是这个项目里**每次听它的都赢、不听它的都栽**的那条规律。
-
-| 问题 | 我一开始想自己造 | 换成谁的成熟做法 | 结果 |
+| Problem | First instinct (build own) | Replaced by whose mature solution | Result |
 |---|---|---|---|
-| **怎么管进程的生死** | 从零写一个 564 行的看护程序 | **systemd**（1980 年代 init 一路演化下来的东西） | **代码 564 → 298 行**，而且第 1 版里最难的六条需求**不是被解决的，是消失了**：进程身份、判活探针、注册表跨重启存活、崩溃窗口、说不准时的死锁出口，全没了 |
-| **两条命令同时来了怎么办** | 在进程内存里放一个版本号当护栏 | **文件锁**（dpkg / apt / git 都这么干，`O_EXCL` + `/run` 下的 tmpfs） | 内存里的护栏**两个终端各跑一条命令就互相看不见**；文件锁是操作系统给的，跨进程有效。**比原方案更强，不是妥协** |
-| **系统里多出来的东西谁来删** | 想按名字前缀删（`theseus-*`） | **Terraform / Kubernetes / Puppet 一致的答案**：只删自己造的，靠"我造的"这个记号，不靠"不在清单里"这个推论 | 按前缀删**会连旧系统一起删掉**——那是我真写下过的一条危险指令。**换成记号，这个错从根上不可能犯** |
-| **痕迹用什么存** | 自己定一套文件格式 | **SQLite** | 不丢半条（事务）、不记两遍（唯一约束）、追因果链（递归查询一句话）、翻得动（索引）——**四件难事全是现成的** |
+| Process lifecycle | a 564-line hand-rolled watchdog | **systemd** (four decades of init evolution) | 500 lines deleted |
+| Concurrent commands | in-memory version guard | **file locks** (dpkg / apt / git all do this: `O_EXCL` + lockfile) | works across processes |
+| Who deletes leftover artifacts | delete by name prefix (`theseus-*`) | **declared-state reconciliation** (Terraform / Kubernetes / Puppet consensus) | no orphans, no missed |
+| What stores traces | a custom file format | **SQLite** | atomic (transactions), single-recorded (unique constraints), causal chains (recursive queries), queryable (indexes) |
 
-**一条更硬的观察**：上面四次里，成熟做法给的不只是"省了工"，
-而是**让一批需求直接不存在了**。自己造的方案要解决的那些难题，很多是**方案自己带来的**。
+**A harder observation**: what the mature solutions gave was not merely "saved work" —
+they made **entire categories of requirements disappear**. The hard problems a hand-rolled
+solution must solve are often problems **the hand-rolled solution itself created**.
 
----
+## Conversely: What Genuinely Needs Building
 
-## 反过来说：哪些地方确实要自己造
-
-用了成熟地基之后，这个系统里**真正必须自己写**的只剩很少几样。它们值得被单独盯着：
-
-- **声明是唯一入口**（没写进声明的东西不属于这个系统）
-- **不撒谎的状态翻译**（底层状态比我们的多，逐个明写，认不出的必须带原文报出来）
-- **依赖的预检**（成环 / 悬空，在动手之前拦下）
-- **双向对账**（装着但没声明的、声明了但没装的，都要点名）
-
-**这四样没有现成答案，因为它们是这个系统特有的。** 除此之外每写一行"自己想的"，都该先回头问一遍第一句话。
+Folding state from append-only traces, the human door (HumanDoor), intent canonization —
+these have no off-the-shelf answer. That is exactly why they are the system's core.

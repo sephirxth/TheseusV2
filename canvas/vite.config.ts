@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
-  // 开发时前端由 vite 热更，数据仍走真服务端。
+  // In dev the frontend hot-reloads via vite; data still goes through the real server.
   server: { proxy: { '/api': 'http://127.0.0.1:8811' } },
   build: { outDir: 'dist' },
 });

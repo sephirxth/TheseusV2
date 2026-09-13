@@ -17,7 +17,7 @@ export interface TreeData { current: string | null; line: string; nodes: TreeNod
 export interface Proposal { id: string; text: string; at: string | null; ts: string; parent: string | null }
 
 export interface Note { id: string; x: number; y: number; w?: number; h?: number; s?: number; t?: number; text: string }
-/** 原生连线：人画的关联批注——和birth edge/merge edge（痕迹的投影）不是一个东西。 */
+/** Native link: human-drawn relation annotation — a different thing from birth/merge edges (trace projections). */
 export interface Link { id: string; from: string; to: string; label?: string }
 export interface Layout {
   positions: Record<string, { x: number; y: number; s?: number }>;
@@ -60,7 +60,7 @@ export const act = async (
   return res.json() as Promise<{ id: string }>;
 };
 
-/** 服务端只喊"变了"，取数还是主动来取。 */
+/** The server only says something changed; fetching stays pull-based. */
 export function onChange(cb: () => void): () => void {
   const es = new EventSource('/api/events');
   es.onmessage = cb;

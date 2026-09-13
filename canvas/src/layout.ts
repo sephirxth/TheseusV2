@@ -44,9 +44,9 @@ export function autoPlace(
   const seen = new Set<string>();
   for (const r of roots) {
     visit(r, 0, seen);
-    row += ROOT_GAP;                          // 根与根之间留两行空
+    row += ROOT_GAP;                          // two blank rows between roots
   }
 
-  for (const id of Object.keys(placed)) delete out[id];   // 人摆过的，一律不碰
+  for (const id of Object.keys(placed)) delete out[id];   // human-placed: never touched
   return out;
 }
